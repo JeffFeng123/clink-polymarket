@@ -14,6 +14,7 @@ class CreateTradeIntentRequest(BaseModel):
     rationale: str | None = None
     core_action_id: str | None = None
     core_policy_decision_id: str | None = None
+    core_audit_event_ids: list[str] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
 
 
@@ -33,6 +34,8 @@ class TradeIntent(BaseModel):
     rationale: str | None = None
     core_action_id: str | None = None
     core_policy_decision_id: str | None = None
+    core_audit_event_ids: list[str] = Field(default_factory=list)
+    core_policy_decision: dict | None = None
     metadata: dict = Field(default_factory=dict)
     created_at: str
     updated_at: str

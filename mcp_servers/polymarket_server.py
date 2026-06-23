@@ -44,6 +44,70 @@ def _request_json(url: str, payload: dict | None = None) -> dict:
         raise RuntimeError(f"polymarket adapter request failed: {exc}") from exc
 
 
+def _create_core_action_intent(
+    user_id: str,
+    amount_usdc: str,
+    market_id: str,
+    question: str,
+    metadata: dict,
+) -> dict:
+    payload = {
+        "user_id": user_id,
+        "agent_id": "clink_polymarket_agent",
+        "action_type": "market_trade",
+        "amount_usdc": amount_usdc,
+        "target": market_id,
+        "description": question,
+        "metadata": metadata,
+    }
+    return _request_json(f"{CONFIG.clink_core_action_service_url.rstrip('/')}/actions", payload)
+
+
+def _evaluate_core_policy(
+    action_id: str,
+    user_id: str,
+    amount_usdc: str,
+    market_id: str,
+    user_confirmed: bool,
+    live_mode: bool,
+) -> dict:
+    payload = {
+        "action_id": action_id,
+        "user_id": user_id,
+        "agent_id": "clink_polymarket_agent",
+        "action_type": "market_trade",
+        "amount_usdc": amount_usdc,
+        "merchant_id": "polymarket",
+        "risk_level": "medium" if live_mode else "low",
+        "risk_score": 45 if live_mode else 20,
+        "risk_action": "manual_review" if live_mode else "approve",
+        "user_confirmed": user_confirmed,
+        "requires_confirmation": True,
+        "live_mode": live_mode,
+        "metadata": {"market_id": market_id, "adapter": "clink-polymarket"},
+    }
+    return _request_json(f"{CONFIG.clink_core_policy_service_url.rstrip('/')}/policies/evaluate", payload)
+
+
+def _write_core_audit_event(
+    event_type: str,
+    action_id: str,
+    user_id: str,
+    policy_decision_id: str | None = None,
+    payload: dict | None = None,
+) -> dict:
+    request = {
+        "event_type": event_type,
+        "source_service": "clink-polymarket",
+        "action_id": action_id,
+        "user_id": user_id,
+        "agent_id": "clink_polymarket_agent",
+        "policy_decision_id": policy_decision_id,
+        "payload": payload or {},
+    }
+    return _request_json(f"{CONFIG.clink_core_audit_service_url.rstrip('/')}/audit/events", request)
+
+
 @MCP_SERVER.tool()
 def search_prediction_markets(
     query: str | None = None,
@@ -70,9 +134,60 @@ def create_trade_intent(
     rationale: str | None = None,
     core_action_id: str | None = None,
     core_policy_decision_id: str | None = None,
+    user_confirmed: bool = False,
+    live_mode: bool = False,
     metadata: dict | None = None,
 ) -> TradeIntent:
-    """Create a paper trade intent/order preview. This does not place a live order."""
+    """Create a paper trade intent/order preview after clink-core action/policy/audit gates."""
+    enriched_metadata = {
+        **(metadata or {}),
+        "market_id": market_id,
+        "question": question,
+        "outcome": outcome,
+        "side": side,
+        "adapter": "clink-polymarket",
+        "live_mode": live_mode,
+    }
+    core_action = {"action_id": core_action_id} if core_action_id else _create_core_action_intent(
+        user_id=user_id,
+        amount_usdc=amount_usdc,
+        market_id=market_id,
+        question=question,
+        metadata=enriched_metadata,
+    )
+    audit_action = _write_core_audit_event(
+        event_type="polymarket_trade_intent_requested",
+        action_id=core_action["action_id"],
+        user_id=user_id,
+        payload=enriched_metadata,
+    )
+    core_policy = (
+        {"policy_decision_id": core_policy_decision_id, "approved": True, "decision": "approved", "reason_code": "PRECHECKED"}
+        if core_policy_decision_id
+        else _evaluate_core_policy(
+            action_id=core_action["action_id"],
+            user_id=user_id,
+            amount_usdc=amount_usdc,
+            market_id=market_id,
+            user_confirmed=user_confirmed,
+            live_mode=live_mode,
+        )
+    )
+    audit_policy = _write_core_audit_event(
+        event_type="polymarket_policy_evaluated",
+        action_id=core_action["action_id"],
+        user_id=user_id,
+        policy_decision_id=core_policy.get("policy_decision_id"),
+        payload={
+            "approved": core_policy.get("approved"),
+            "decision": core_policy.get("decision"),
+            "reason_code": core_policy.get("reason_code"),
+        },
+    )
+    if core_policy.get("decision") == "blocked":
+        raise RuntimeError(f"clink-core policy blocked trade intent: {core_policy.get('reason_code')}")
+
+    enriched_metadata["core_policy_decision"] = core_policy
     request = CreateTradeIntentRequest(
         user_id=user_id,
         market_id=market_id,
@@ -83,9 +198,14 @@ def create_trade_intent(
         limit_price=limit_price,
         max_slippage_bps=max_slippage_bps,
         rationale=rationale,
-        core_action_id=core_action_id,
-        core_policy_decision_id=core_policy_decision_id,
-        metadata=metadata or {},
+        core_action_id=core_action["action_id"],
+        core_policy_decision_id=core_policy.get("policy_decision_id"),
+        core_audit_event_ids=[
+            event_id
+            for event_id in [audit_action.get("event_id"), audit_policy.get("event_id")]
+            if event_id
+        ],
+        metadata=enriched_metadata,
     )
     response = _request_json(f"{CONFIG.trade_service_url}/trade-intents", request.model_dump())
     return TradeIntent(**response)

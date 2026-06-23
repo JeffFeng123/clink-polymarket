@@ -23,6 +23,10 @@ class TradeService:
         estimated_shares = None
         if request.limit_price and request.limit_price > 0:
             estimated_shares = float(amount / Decimal(str(request.limit_price)))
+        core_policy = request.metadata.get("core_policy_decision") if request.metadata else None
+        state = "preview_ready"
+        if isinstance(core_policy, dict) and not core_policy.get("approved"):
+            state = "needs_confirmation"
         intent = TradeIntent(
             trade_intent_id=f"trade_{uuid4().hex[:12]}",
             user_id=request.user_id,
@@ -35,17 +39,19 @@ class TradeService:
             limit_price=request.limit_price,
             estimated_shares=estimated_shares,
             max_slippage_bps=request.max_slippage_bps,
-            state="preview_ready",
+            state=state,
             rationale=request.rationale,
             core_action_id=request.core_action_id,
             core_policy_decision_id=request.core_policy_decision_id,
+            core_audit_event_ids=request.core_audit_event_ids,
+            core_policy_decision=core_policy if isinstance(core_policy, dict) else None,
             metadata=request.metadata,
             created_at=self._format_time(now),
             updated_at=self._format_time(now),
             event_log=[
                 {
                     "event": "trade_intent_created",
-                    "state": "preview_ready",
+                    "state": state,
                     "created_at": self._format_time(now),
                 }
             ],

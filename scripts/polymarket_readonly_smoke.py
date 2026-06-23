@@ -43,6 +43,7 @@ async def main() -> None:
                         "amount_usdc": "1",
                         "limit_price": selected.get("best_yes_price"),
                         "rationale": "Read-only smoke test paper trade intent; no live order submitted.",
+                        "user_confirmed": True,
                     },
                 )
             )

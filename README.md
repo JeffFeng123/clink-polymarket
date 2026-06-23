@@ -8,7 +8,7 @@
 clink-polymarket 是基于 clink-core 的第一个金融类 A2A 场景适配器。
 ```
 
-This repository should not duplicate authorization, policy, payment, or audit logic. It should discover Polymarket opportunities, create trade intents, and call `clink-core` for action control.
+This repository does not duplicate authorization, policy, payment, or audit logic. It discovers Polymarket opportunities, creates trade intents, and must call `clink-core` for action control.
 
 ## Product Boundary
 
@@ -29,11 +29,14 @@ clink-core:
 
 ## Current v0.1 Scope
 
-This first version is read-only and paper-only:
+This first version is read-only and paper-only, but it strongly depends on `clink-core` for trade intent control:
 
 - Search active Polymarket markets through the Gamma API.
 - Normalize market data into stable adapter objects.
-- Create paper trade intents / order previews.
+- Create `clink-core` action intents before local paper trade intents.
+- Evaluate `clink-core` policy before local paper trade intents.
+- Write `clink-core` audit events for trade-intent requests and policy decisions.
+- Create local paper trade intents / order previews only after core policy is not blocked.
 - Expose tools through MCP.
 - Do not sign orders.
 - Do not submit live trades.
@@ -54,8 +57,8 @@ flowchart LR
     MCP --> TRADE[trade_service]
     MARKET --> GAMMA[Polymarket Gamma API]
     TRADE --> STORE[trade_intents.jsonl]
-    MCP -. future .-> CORE[clink-core MCP]
-    CORE -. action/policy/audit .-> TRADE
+    MCP --> CORE[clink-core Action / Policy / Audit]
+    CORE --> TRADE
 ```
 
 ## MCP Tools
@@ -63,7 +66,7 @@ flowchart LR
 | Tool | Purpose |
 |---|---|
 | `search_prediction_markets` | Search active Polymarket markets. |
-| `create_trade_intent` | Create a paper trade intent/order preview. |
+| `create_trade_intent` | Create a core-governed paper trade intent/order preview. |
 | `get_trade_intent` | Fetch a stored trade intent. |
 | `polymarket_adapter_health` | Check backing service health. |
 
@@ -82,7 +85,15 @@ bash run_demo_status.sh
 bash run_demo_stop.sh
 ```
 
-Expected services:
+Start `clink-core` first. `create_trade_intent` requires:
+
+```text
+clink-core action_service   8016
+clink-core policy_service   8015
+clink-core audit_service    8017
+```
+
+Then start this adapter. Expected services:
 
 ```text
 polymarket_market_service   8020
@@ -94,6 +105,16 @@ Smoke test:
 
 ```bash
 python3 scripts/polymarket_readonly_smoke.py
+```
+
+Smoke path:
+
+```text
+search_prediction_markets
+-> clink-core create_action_intent
+-> clink-core evaluate_action_policy
+-> clink-core write_audit_event
+-> create local paper trade intent
 ```
 
 ## Directory Structure
@@ -108,15 +129,15 @@ shared/                       config
 
 ## Next Phases
 
-1. Add `clink-core` action/policy/audit integration.
-2. Add market snapshot scoring: liquidity, spread, price, expiry.
-3. Add research/signal service for thesis generation.
-4. Add paper portfolio and PnL tracking.
-5. Add controlled live execution only after policy, confirmation, signer isolation, and compliance review.
+1. Add market snapshot scoring: liquidity, spread, price, expiry.
+2. Add research/signal service for thesis generation.
+3. Add paper portfolio and PnL tracking.
+4. Add controlled live execution only after policy, confirmation, signer isolation, and compliance review.
 
 ## Current Boundaries
 
 - v0.1 is read-only and paper-only.
+- `clink-core` action, policy, and audit services must be running for trade intent creation.
 - No live Polymarket orders are signed or submitted.
 - If Gamma API is unavailable, the service returns mock fallback markets for demo continuity.
 - US/restricted-jurisdiction trading and Polymarket Terms of Service must be respected before any live execution work.

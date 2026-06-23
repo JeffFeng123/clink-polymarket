@@ -15,6 +15,9 @@ class AppConfig:
     clink_core_action_mcp_url: str = "http://127.0.0.1:9016/mcp/"
     clink_core_policy_mcp_url: str = "http://127.0.0.1:9015/mcp/"
     clink_core_audit_mcp_url: str = "http://127.0.0.1:9017/mcp/"
+    clink_core_action_service_url: str = "http://127.0.0.1:8016"
+    clink_core_policy_service_url: str = "http://127.0.0.1:8015"
+    clink_core_audit_service_url: str = "http://127.0.0.1:8017"
 
     @classmethod
     def from_env(cls) -> "AppConfig":
@@ -33,6 +36,9 @@ class AppConfig:
             clink_core_action_mcp_url=os.getenv("CLINK_CORE_ACTION_MCP_URL", "http://127.0.0.1:9016/mcp/"),
             clink_core_policy_mcp_url=os.getenv("CLINK_CORE_POLICY_MCP_URL", "http://127.0.0.1:9015/mcp/"),
             clink_core_audit_mcp_url=os.getenv("CLINK_CORE_AUDIT_MCP_URL", "http://127.0.0.1:9017/mcp/"),
+            clink_core_action_service_url=os.getenv("CLINK_CORE_ACTION_SERVICE_URL", "http://127.0.0.1:8016"),
+            clink_core_policy_service_url=os.getenv("CLINK_CORE_POLICY_SERVICE_URL", "http://127.0.0.1:8015"),
+            clink_core_audit_service_url=os.getenv("CLINK_CORE_AUDIT_SERVICE_URL", "http://127.0.0.1:8017"),
         )
 
     def describe(self) -> dict:
