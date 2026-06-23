@@ -1,1 +1,122 @@
 # clink-polymarket
+
+`clink-polymarket` is the first financial A2A adapter built on top of `clink-core`.
+
+中文定位：
+
+```text
+clink-polymarket 是基于 clink-core 的第一个金融类 A2A 场景适配器。
+```
+
+This repository should not duplicate authorization, policy, payment, or audit logic. It should discover Polymarket opportunities, create trade intents, and call `clink-core` for action control.
+
+## Product Boundary
+
+```text
+clink-polymarket:
+  What prediction market is relevant?
+  What is the price/liquidity/order-preview?
+  What trade intent should be proposed?
+  What is the paper/live execution state?
+
+clink-core:
+  Can this agent do the action?
+  Was it authorized?
+  Is it inside budget and risk policy?
+  Was confirmation required?
+  What audit trail and receipt prove it?
+```
+
+## Current v0.1 Scope
+
+This first version is read-only and paper-only:
+
+- Search active Polymarket markets through the Gamma API.
+- Normalize market data into stable adapter objects.
+- Create paper trade intents / order previews.
+- Expose tools through MCP.
+- Do not sign orders.
+- Do not submit live trades.
+- Do not custody funds.
+
+Polymarket official docs recommend using the Gamma events endpoint for active market discovery:
+
+```text
+GET https://gamma-api.polymarket.com/events?active=true&closed=false&limit=100
+```
+
+## Architecture
+
+```mermaid
+flowchart LR
+    AGENT[Agent / clink-polymarket user] --> MCP[polymarket MCP]
+    MCP --> MARKET[market_service]
+    MCP --> TRADE[trade_service]
+    MARKET --> GAMMA[Polymarket Gamma API]
+    TRADE --> STORE[trade_intents.jsonl]
+    MCP -. future .-> CORE[clink-core MCP]
+    CORE -. action/policy/audit .-> TRADE
+```
+
+## MCP Tools
+
+| Tool | Purpose |
+|---|---|
+| `search_prediction_markets` | Search active Polymarket markets. |
+| `create_trade_intent` | Create a paper trade intent/order preview. |
+| `get_trade_intent` | Fetch a stored trade intent. |
+| `polymarket_adapter_health` | Check backing service health. |
+
+## Run Locally
+
+```bash
+cp .env.example .env
+pip install -r requirements.txt
+bash run_demo.sh
+```
+
+Status and stop:
+
+```bash
+bash run_demo_status.sh
+bash run_demo_stop.sh
+```
+
+Expected services:
+
+```text
+polymarket_market_service   8020
+polymarket_trade_service    8021
+polymarket_mcp_server       9020
+```
+
+Smoke test:
+
+```bash
+python3 scripts/polymarket_readonly_smoke.py
+```
+
+## Directory Structure
+
+```text
+services/market_service/      read-only Gamma API market discovery
+services/trade_service/       paper trade intent / order preview
+mcp_servers/                  Polymarket MCP adapter
+scripts/                      smoke tests
+shared/                       config
+```
+
+## Next Phases
+
+1. Add `clink-core` action/policy/audit integration.
+2. Add market snapshot scoring: liquidity, spread, price, expiry.
+3. Add research/signal service for thesis generation.
+4. Add paper portfolio and PnL tracking.
+5. Add controlled live execution only after policy, confirmation, signer isolation, and compliance review.
+
+## Current Boundaries
+
+- v0.1 is read-only and paper-only.
+- No live Polymarket orders are signed or submitted.
+- If Gamma API is unavailable, the service returns mock fallback markets for demo continuity.
+- US/restricted-jurisdiction trading and Polymarket Terms of Service must be respected before any live execution work.
