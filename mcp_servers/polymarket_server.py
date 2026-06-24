@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from services.execution_service.schemas import ExecuteApprovedTradeRequest, TradeExecution  # noqa: E402
+from services.execution_service.schemas import ExecuteApprovedTradeRequest, LiveReadiness, TradeExecution  # noqa: E402
 from services.market_service.schemas import SearchMarketsRequest, SearchMarketsResult  # noqa: E402
 from services.opportunity_service.schemas import ScoreOpportunitiesRequest, ScoreOpportunitiesResult  # noqa: E402
 from services.order_service.schemas import CreateOrderPreviewRequest, OrderPreview  # noqa: E402
@@ -369,6 +369,13 @@ def create_order_preview(
     )
     response = _request_json(f"{CONFIG.order_service_url}/order-previews", request.model_dump())
     return OrderPreview(**response)
+
+
+@MCP_SERVER.tool()
+def check_live_readiness() -> LiveReadiness:
+    """Check whether this adapter is configured for real Polymarket execution without exposing secrets."""
+    response = _request_json(f"{CONFIG.execution_service_url}/live-readiness")
+    return LiveReadiness(**response)
 
 
 @MCP_SERVER.tool()

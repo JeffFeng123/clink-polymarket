@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import uuid4
 
-from services.execution_service.schemas import ExecuteApprovedTradeRequest, TradeExecution
+from services.execution_service.schemas import ExecuteApprovedTradeRequest, LiveReadiness, TradeExecution
 from services.order_service.schemas import OrderPreview
 from shared.config import AppConfig
 
@@ -19,6 +19,55 @@ class ExecutionService:
         self.config = AppConfig.from_env()
         default_file = Path(__file__).resolve().parent / "executions.jsonl"
         self.storage_file = Path(os.getenv("POLYMARKET_EXECUTION_FILE", self.config.polymarket_execution_file or str(default_file)))
+
+    def check_live_readiness(self) -> LiveReadiness:
+        missing: list[str] = []
+        warnings: list[str] = []
+        configured = {
+            "POLYMARKET_PRIVATE_KEY": bool(self.config.polymarket_private_key),
+            "POLYMARKET_FUNDER_ADDRESS": bool(self.config.polymarket_funder_address),
+            "POLYMARKET_SIGNATURE_TYPE": self.config.polymarket_signature_type,
+            "POLYMARKET_CHAIN_ID": self.config.polymarket_chain_id,
+            "POLYMARKET_REQUIRE_USER_CONFIRMATION": self.config.polymarket_require_user_confirmation,
+            "POLYMARKET_LIVE_MODE": self.config.polymarket_live_mode,
+        }
+
+        if not self.config.polymarket_live_mode:
+            missing.append("POLYMARKET_LIVE_MODE=true")
+        if not self.config.polymarket_private_key:
+            missing.append("POLYMARKET_PRIVATE_KEY")
+        if not self.config.polymarket_funder_address:
+            missing.append("POLYMARKET_FUNDER_ADDRESS")
+        if self.config.polymarket_signature_type != "3":
+            warnings.append("POLYMARKET_SIGNATURE_TYPE should usually be 3 for Polymarket browser/deposit-wallet flow")
+        if self.config.polymarket_chain_id != 137:
+            missing.append("POLYMARKET_CHAIN_ID=137")
+        if not self.config.polymarket_require_user_confirmation:
+            missing.append("POLYMARKET_REQUIRE_USER_CONFIRMATION=true")
+        try:
+            max_order = self._parse_amount(self.config.polymarket_max_order_usdc)
+            if max_order <= Decimal("0"):
+                missing.append("POLYMARKET_MAX_ORDER_USDC must be greater than 0")
+            elif max_order > Decimal("10"):
+                warnings.append("POLYMARKET_MAX_ORDER_USDC is above 10 USDC; keep demo limits small")
+        except ValueError:
+            missing.append("POLYMARKET_MAX_ORDER_USDC must be a valid decimal string")
+
+        try:
+            import py_clob_client  # noqa: F401
+        except Exception:
+            missing.append("py-clob-client package")
+
+        live_ready = not missing
+        return LiveReadiness(
+            live_ready=live_ready,
+            live_mode_enabled=self.config.polymarket_live_mode,
+            missing=missing,
+            warnings=warnings,
+            configured=configured,
+            max_order_usdc=self.config.polymarket_max_order_usdc,
+            next_action="execute_approved_trade" if live_ready else "configure_live_execution",
+        )
 
     def execute_approved_trade(self, request: ExecuteApprovedTradeRequest) -> TradeExecution:
         now = self._utc_now()

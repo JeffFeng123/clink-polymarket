@@ -22,6 +22,12 @@ def main() -> None:
         os.environ["POLYMARKET_MAX_ORDER_USDC"] = "1"
         os.environ["POLYMARKET_REQUIRE_USER_CONFIRMATION"] = "true"
 
+        readiness = ExecutionService().check_live_readiness()
+        assert readiness.live_ready is False
+        assert "POLYMARKET_LIVE_MODE=true" in readiness.missing
+        assert "POLYMARKET_PRIVATE_KEY" in readiness.missing
+        assert readiness.next_action == "configure_live_execution"
+
         preview = OrderPreviewService().create_order_preview(
             CreateOrderPreviewRequest(
                 user_id="execution-smoke-user",

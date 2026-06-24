@@ -37,3 +37,16 @@ class TradeExecution(BaseModel):
 
     def to_dict(self) -> dict:
         return self.model_dump()
+
+
+class LiveReadiness(BaseModel):
+    live_ready: bool
+    live_mode_enabled: bool
+    missing: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    configured: dict = Field(default_factory=dict)
+    max_order_usdc: str
+    next_action: str
+
+    def to_dict(self) -> dict:
+        return self.model_dump()

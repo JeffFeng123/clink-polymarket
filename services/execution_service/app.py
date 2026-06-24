@@ -41,6 +41,10 @@ def create_app() -> FastAPI:
             "mode": "dry_run" if not APP_CONFIG.polymarket_live_mode else "live_blocked_not_implemented",
         }
 
+    @app.get("/live-readiness")
+    def check_live_readiness() -> dict:
+        return SERVICE.check_live_readiness().to_dict()
+
     @app.post("/executions")
     def execute_approved_trade(request: ExecuteApprovedTradeRequest) -> dict:
         return SERVICE.execute_approved_trade(request).to_dict()

@@ -75,6 +75,7 @@ flowchart LR
 | `create_trade_intent` | Create a core-governed paper trade intent/order preview. |
 | `create_order_preview` | Create a non-executing live order preview that requires user confirmation. |
 | `get_order_preview` | Fetch a stored order preview. |
+| `check_live_readiness` | Check whether live execution is configured without exposing secrets. |
 | `execute_approved_trade` | Evaluate execution for an order preview; dry-run by default. |
 | `get_trade_execution` | Fetch a stored execution evaluation. |
 | `submit_agent_trade_intent` | One-call agent flow: score, core-gate, create trade intent, record paper position. |
@@ -154,7 +155,7 @@ services/opportunity_service/   market opportunity scoring
 services/trade_service/         paper trade intent / order preview
 services/portfolio_service/     paper positions / portfolio / PnL
 services/order_service/         non-executing order previews
-services/execution_service/     dry-run execution gate
+services/execution_service/     dry-run execution gate / live readiness checks
 mcp_servers/                    Polymarket MCP adapter
 scripts/                        smoke tests
 shared/                         config

@@ -27,6 +27,7 @@ async def main() -> None:
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
             health = _content_to_dict(await session.call_tool("polymarket_adapter_health"))
+            readiness = _content_to_dict(await session.call_tool("check_live_readiness"))
             opportunities = _content_to_dict(
                 await session.call_tool(
                     "score_market_opportunities",
@@ -95,6 +96,7 @@ async def main() -> None:
                 json.dumps(
                     {
                         "health": health,
+                        "live_readiness": readiness,
                         "opportunities": opportunities,
                         "order_preview": order_preview,
                         "blocked_execution": blocked_execution,
