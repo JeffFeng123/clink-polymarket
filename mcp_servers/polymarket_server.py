@@ -10,14 +10,16 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from services.market_service.schemas import PredictionMarket, SearchMarketsRequest, SearchMarketsResult  # noqa: E402
+from services.market_service.schemas import SearchMarketsRequest, SearchMarketsResult  # noqa: E402
+from services.opportunity_service.schemas import ScoreOpportunitiesRequest, ScoreOpportunitiesResult  # noqa: E402
+from services.portfolio_service.schemas import CreatePaperPositionRequest, PaperPosition, PortfolioSnapshot  # noqa: E402
 from services.trade_service.schemas import CreateTradeIntentRequest, TradeIntent  # noqa: E402
 from shared.config import AppConfig  # noqa: E402
 
 CONFIG = AppConfig.from_env()
 MCP_SERVER = FastMCP(
     "Clink Polymarket MCP Server",
-    instructions="Expose read-only Polymarket market discovery and paper trade intent tools.",
+    instructions="Expose public MCP tools for Polymarket discovery, opportunity scoring, core-governed trade intents, and paper portfolio tracking.",
     host=CONFIG.polymarket_mcp_host,
     port=CONFIG.polymarket_mcp_port,
     stateless_http=True,
@@ -46,6 +48,7 @@ def _request_json(url: str, payload: dict | None = None) -> dict:
 
 def _create_core_action_intent(
     user_id: str,
+    agent_id: str,
     amount_usdc: str,
     market_id: str,
     question: str,
@@ -53,7 +56,7 @@ def _create_core_action_intent(
 ) -> dict:
     payload = {
         "user_id": user_id,
-        "agent_id": "clink_polymarket_agent",
+        "agent_id": agent_id,
         "action_type": "market_trade",
         "amount_usdc": amount_usdc,
         "target": market_id,
@@ -66,6 +69,7 @@ def _create_core_action_intent(
 def _evaluate_core_policy(
     action_id: str,
     user_id: str,
+    agent_id: str,
     amount_usdc: str,
     market_id: str,
     user_confirmed: bool,
@@ -74,7 +78,7 @@ def _evaluate_core_policy(
     payload = {
         "action_id": action_id,
         "user_id": user_id,
-        "agent_id": "clink_polymarket_agent",
+        "agent_id": agent_id,
         "action_type": "market_trade",
         "amount_usdc": amount_usdc,
         "merchant_id": "polymarket",
@@ -93,6 +97,7 @@ def _write_core_audit_event(
     event_type: str,
     action_id: str,
     user_id: str,
+    agent_id: str,
     policy_decision_id: str | None = None,
     payload: dict | None = None,
 ) -> dict:
@@ -101,11 +106,22 @@ def _write_core_audit_event(
         "source_service": "clink-polymarket",
         "action_id": action_id,
         "user_id": user_id,
-        "agent_id": "clink_polymarket_agent",
+        "agent_id": agent_id,
         "policy_decision_id": policy_decision_id,
         "payload": payload or {},
     }
     return _request_json(f"{CONFIG.clink_core_audit_service_url.rstrip('/')}/audit/events", request)
+
+
+def _choose_price(market: dict, fallback: float | None = None) -> float | None:
+    price = market.get("best_yes_price")
+    if price is None:
+        prices = market.get("outcome_prices") if isinstance(market.get("outcome_prices"), list) else []
+        price = prices[0] if prices else fallback
+    try:
+        return float(price) if price is not None else None
+    except (TypeError, ValueError):
+        return fallback
 
 
 @MCP_SERVER.tool()
@@ -122,11 +138,36 @@ def search_prediction_markets(
 
 
 @MCP_SERVER.tool()
+def score_market_opportunities(
+    query: str | None = None,
+    goal: str | None = None,
+    limit: int = 10,
+    max_results: int = 5,
+    min_liquidity: float | None = None,
+    markets: list[dict] | None = None,
+) -> ScoreOpportunitiesResult:
+    """Score candidate markets so any external agent can decide what to inspect or trade."""
+    candidate_markets = markets
+    if candidate_markets is None:
+        search = search_prediction_markets(query=query or goal, limit=limit, min_liquidity=min_liquidity)
+        candidate_markets = [market.model_dump() for market in search.markets]
+    request = ScoreOpportunitiesRequest(
+        markets=candidate_markets,
+        goal=goal or query,
+        max_results=max_results,
+        min_liquidity=min_liquidity,
+    )
+    response = _request_json(f"{CONFIG.opportunity_service_url}/opportunities/score", request.model_dump())
+    return ScoreOpportunitiesResult(**response)
+
+
+@MCP_SERVER.tool()
 def create_trade_intent(
     user_id: str,
     market_id: str,
     question: str,
     amount_usdc: str,
+    agent_id: str = "clink_polymarket_agent",
     outcome: str = "Yes",
     side: str = "buy",
     limit_price: float | None = None,
@@ -150,6 +191,7 @@ def create_trade_intent(
     }
     core_action = {"action_id": core_action_id} if core_action_id else _create_core_action_intent(
         user_id=user_id,
+        agent_id=agent_id,
         amount_usdc=amount_usdc,
         market_id=market_id,
         question=question,
@@ -159,6 +201,7 @@ def create_trade_intent(
         event_type="polymarket_trade_intent_requested",
         action_id=core_action["action_id"],
         user_id=user_id,
+        agent_id=agent_id,
         payload=enriched_metadata,
     )
     core_policy = (
@@ -167,6 +210,7 @@ def create_trade_intent(
         else _evaluate_core_policy(
             action_id=core_action["action_id"],
             user_id=user_id,
+            agent_id=agent_id,
             amount_usdc=amount_usdc,
             market_id=market_id,
             user_confirmed=user_confirmed,
@@ -177,6 +221,7 @@ def create_trade_intent(
         event_type="polymarket_policy_evaluated",
         action_id=core_action["action_id"],
         user_id=user_id,
+        agent_id=agent_id,
         policy_decision_id=core_policy.get("policy_decision_id"),
         payload={
             "approved": core_policy.get("approved"),
@@ -190,6 +235,7 @@ def create_trade_intent(
     enriched_metadata["core_policy_decision"] = core_policy
     request = CreateTradeIntentRequest(
         user_id=user_id,
+        agent_id=agent_id,
         market_id=market_id,
         question=question,
         amount_usdc=amount_usdc,
@@ -212,6 +258,121 @@ def create_trade_intent(
 
 
 @MCP_SERVER.tool()
+def create_paper_position(
+    user_id: str,
+    trade_intent_id: str,
+    market_id: str,
+    question: str,
+    amount_usdc: str,
+    entry_price: float,
+    outcome: str = "Yes",
+    side: str = "buy",
+    current_price: float | None = None,
+    core_action_id: str | None = None,
+    core_policy_decision_id: str | None = None,
+    core_audit_event_ids: list[str] | None = None,
+    metadata: dict | None = None,
+) -> PaperPosition:
+    """Record a paper position and expose amount/PnL without live order execution."""
+    request = CreatePaperPositionRequest(
+        user_id=user_id,
+        trade_intent_id=trade_intent_id,
+        market_id=market_id,
+        question=question,
+        outcome=outcome,
+        side=side,
+        amount_usdc=amount_usdc,
+        entry_price=entry_price,
+        current_price=current_price,
+        core_action_id=core_action_id,
+        core_policy_decision_id=core_policy_decision_id,
+        core_audit_event_ids=core_audit_event_ids or [],
+        metadata=metadata or {},
+    )
+    response = _request_json(f"{CONFIG.portfolio_service_url}/positions", request.model_dump())
+    return PaperPosition(**response)
+
+
+@MCP_SERVER.tool()
+def get_portfolio_status(user_id: str) -> PortfolioSnapshot:
+    """Return open paper positions, capital deployed, current value, and unrealized PnL."""
+    response = _request_json(f"{CONFIG.portfolio_service_url}/portfolio/{user_id}")
+    return PortfolioSnapshot(**response)
+
+
+@MCP_SERVER.tool()
+def submit_agent_trade_intent(
+    user_id: str,
+    goal: str,
+    amount_usdc: str,
+    agent_id: str = "external_agent",
+    query: str | None = None,
+    user_confirmed: bool = False,
+    max_results: int = 5,
+    live_mode: bool = False,
+) -> dict:
+    """One-call public MCP flow for agents: score markets, pass core gates, create a paper trade intent, and record a paper position."""
+    opportunities = score_market_opportunities(query=query or goal, goal=goal, limit=max_results, max_results=max_results)
+    if not opportunities.opportunities:
+        raise RuntimeError("no Polymarket opportunities found")
+    selected = next(
+        (item for item in opportunities.opportunities if item.recommended_action in {"paper_trade", "watch"}),
+        opportunities.opportunities[0],
+    )
+    if selected.recommended_action == "reject":
+        raise RuntimeError("top opportunity was rejected by adapter scoring")
+
+    market = selected.market
+    entry_price = _choose_price(market, selected.price)
+    if entry_price is None:
+        raise RuntimeError("selected market has no usable price")
+
+    trade_intent = create_trade_intent(
+        user_id=user_id,
+        agent_id=agent_id,
+        market_id=selected.market_id,
+        question=selected.question,
+        outcome=selected.outcome,
+        side="buy",
+        amount_usdc=amount_usdc,
+        limit_price=entry_price,
+        rationale=f"Agent goal: {goal}. Adapter score: {selected.opportunity_score}.",
+        user_confirmed=user_confirmed,
+        live_mode=live_mode,
+        metadata={
+            "goal": goal,
+            "opportunity_score": selected.model_dump(),
+            "public_mcp_surface": True,
+        },
+    )
+    position = create_paper_position(
+        user_id=user_id,
+        trade_intent_id=trade_intent.trade_intent_id,
+        market_id=trade_intent.market_id,
+        question=trade_intent.question,
+        outcome=trade_intent.outcome,
+        side=trade_intent.side,
+        amount_usdc=trade_intent.amount_usdc,
+        entry_price=entry_price,
+        current_price=entry_price,
+        core_action_id=trade_intent.core_action_id,
+        core_policy_decision_id=trade_intent.core_policy_decision_id,
+        core_audit_event_ids=trade_intent.core_audit_event_ids,
+        metadata={"agent_id": agent_id, "goal": goal},
+    )
+    portfolio = get_portfolio_status(user_id)
+    return {
+        "approved": True,
+        "agent_id": agent_id,
+        "selected_opportunity": selected.model_dump(),
+        "trade_intent": trade_intent.model_dump(),
+        "position": position.model_dump(),
+        "portfolio": portfolio.model_dump(),
+        "next_action": "paper_position_created",
+    }
+
+
+@MCP_SERVER.tool()
 def get_trade_intent(trade_intent_id: str) -> TradeIntent:
     """Fetch a stored paper trade intent."""
     response = _request_json(f"{CONFIG.trade_service_url}/trade-intents/{trade_intent_id}")
@@ -223,7 +384,17 @@ def polymarket_adapter_health() -> dict:
     """Check backing service health."""
     market = _request_json(f"{CONFIG.market_service_url}/healthz")
     trade = _request_json(f"{CONFIG.trade_service_url}/healthz")
-    return {"service": "clink_polymarket_adapter", "status": "ok", "market": market, "trade": trade}
+    opportunity = _request_json(f"{CONFIG.opportunity_service_url}/healthz")
+    portfolio = _request_json(f"{CONFIG.portfolio_service_url}/healthz")
+    return {
+        "service": "clink_polymarket_adapter",
+        "status": "ok",
+        "public_mcp_surface": True,
+        "market": market,
+        "trade": trade,
+        "opportunity": opportunity,
+        "portfolio": portfolio,
+    }
 
 
 def main() -> None:

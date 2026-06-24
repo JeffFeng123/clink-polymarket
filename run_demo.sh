@@ -57,11 +57,14 @@ start_service() {
 
 start_service "polymarket_market_service" python3 services/market_service/app.py
 start_service "polymarket_trade_service" python3 services/trade_service/app.py
+start_service "polymarket_opportunity_service" python3 services/opportunity_service/app.py
+start_service "polymarket_portfolio_service" python3 services/portfolio_service/app.py
 start_service "polymarket_mcp_server" python3 mcp_servers/polymarket_server.py
 
 echo
-echo "Clink Polymarket read-only adapter is ready."
+echo "Clink Polymarket public MCP surface is ready."
 echo "Run: python3 scripts/polymarket_readonly_smoke.py"
+echo "Run: python3 scripts/public_mcp_surface_smoke.py"
 echo "Use bash run_demo_stop.sh to stop the backgrounded demo safely."
 
 while true; do

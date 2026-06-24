@@ -20,13 +20,15 @@ service_url() {
   case "$1" in
     polymarket_market_service) printf "http://%s:%s" "${POLYMARKET_MARKET_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_MARKET_SERVICE_PORT:-8020}" ;;
     polymarket_trade_service) printf "http://%s:%s" "${POLYMARKET_TRADE_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_TRADE_SERVICE_PORT:-8021}" ;;
+    polymarket_opportunity_service) printf "http://%s:%s" "${POLYMARKET_OPPORTUNITY_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_OPPORTUNITY_SERVICE_PORT:-8022}" ;;
+    polymarket_portfolio_service) printf "http://%s:%s" "${POLYMARKET_PORTFOLIO_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_PORTFOLIO_SERVICE_PORT:-8023}" ;;
     polymarket_mcp_server) printf "http://%s:%s/mcp/" "${POLYMARKET_MCP_HOST:-127.0.0.1}" "${POLYMARKET_MCP_PORT:-9020}" ;;
     *) printf "-" ;;
   esac
 }
 
 print_line() {
-  printf "%-28s %-12s %-8s %-50s %s\n" "$1" "$2" "$3" "$4" "$5"
+  printf "%-32s %-12s %-8s %-50s %s\n" "$1" "$2" "$3" "$4" "$5"
 }
 
 echo "Clink Polymarket runtime status"
