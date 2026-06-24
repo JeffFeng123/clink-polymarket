@@ -34,6 +34,7 @@ class PredictionMarket(BaseModel):
 class SearchMarketsResult(BaseModel):
     query: str | None = None
     source: str
+    source_detail: str | None = None
     markets: list[PredictionMarket] = Field(default_factory=list)
     count: int
 
