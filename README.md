@@ -75,6 +75,8 @@ flowchart LR
 | `create_trade_intent` | Create a core-governed paper trade intent/order preview. |
 | `create_order_preview` | Create a non-executing live order preview that requires user confirmation. |
 | `get_order_preview` | Fetch a stored order preview. |
+| `execute_approved_trade` | Evaluate execution for an order preview; dry-run by default. |
+| `get_trade_execution` | Fetch a stored execution evaluation. |
 | `submit_agent_trade_intent` | One-call agent flow: score, core-gate, create trade intent, record paper position. |
 | `create_paper_position` | Record a paper position after a trade intent is approved. |
 | `get_portfolio_status` | Show open positions, capital deployed, current value, and unrealized PnL. |
@@ -112,6 +114,7 @@ polymarket_trade_service        8021
 polymarket_opportunity_service  8022
 polymarket_portfolio_service    8023
 polymarket_order_service        8024
+polymarket_execution_service    8025
 polymarket_mcp_server           9020
 ```
 
@@ -151,6 +154,7 @@ services/opportunity_service/   market opportunity scoring
 services/trade_service/         paper trade intent / order preview
 services/portfolio_service/     paper positions / portfolio / PnL
 services/order_service/         non-executing order previews
+services/execution_service/     dry-run execution gate
 mcp_servers/                    Polymarket MCP adapter
 scripts/                        smoke tests
 shared/                         config
@@ -179,7 +183,7 @@ clink-polymarket is the venue adapter.
 
 1. Add market snapshot scoring for spread, expiry, and historical movement.
 2. Add research/signal service for thesis generation.
-3. Add controlled live execution only after policy, confirmation, signer isolation, and compliance review. Order preview is already available as the pre-execution checkpoint.
+3. Add controlled live execution only after policy, confirmation, signer isolation, and compliance review. Order preview and dry-run execution are available as pre-live checkpoints.
 4. Add order/position reconciliation against Polymarket execution APIs.
 
 ## Current Boundaries

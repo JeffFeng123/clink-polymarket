@@ -54,6 +54,25 @@ async def main() -> None:
                     },
                 )
             )
+            blocked_execution = _content_to_dict(
+                await session.call_tool(
+                    "execute_approved_trade",
+                    arguments={
+                        "order_preview_id": order_preview["order_preview_id"],
+                        "user_confirmed": False,
+                    },
+                )
+            )
+            simulated_execution = _content_to_dict(
+                await session.call_tool(
+                    "execute_approved_trade",
+                    arguments={
+                        "order_preview_id": order_preview["order_preview_id"],
+                        "user_confirmed": True,
+                        "confirmation_message": "Smoke test confirmation; dry-run only.",
+                    },
+                )
+            )
             flow = _content_to_dict(
                 await session.call_tool(
                     "submit_agent_trade_intent",
@@ -78,6 +97,8 @@ async def main() -> None:
                         "health": health,
                         "opportunities": opportunities,
                         "order_preview": order_preview,
+                        "blocked_execution": blocked_execution,
+                        "simulated_execution": simulated_execution,
                         "agent_flow": flow,
                         "portfolio": portfolio,
                     },

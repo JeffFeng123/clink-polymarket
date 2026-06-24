@@ -10,6 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from services.execution_service.schemas import ExecuteApprovedTradeRequest, TradeExecution  # noqa: E402
 from services.market_service.schemas import SearchMarketsRequest, SearchMarketsResult  # noqa: E402
 from services.opportunity_service.schemas import ScoreOpportunitiesRequest, ScoreOpportunitiesResult  # noqa: E402
 from services.order_service.schemas import CreateOrderPreviewRequest, OrderPreview  # noqa: E402
@@ -371,6 +372,48 @@ def create_order_preview(
 
 
 @MCP_SERVER.tool()
+def execute_approved_trade(
+    order_preview_id: str,
+    user_confirmed: bool = False,
+    confirmation_message: str | None = None,
+    metadata: dict | None = None,
+) -> TradeExecution:
+    """Evaluate execution for an order preview. Defaults to dry-run unless POLYMARKET_LIVE_MODE is explicitly enabled."""
+    request = ExecuteApprovedTradeRequest(
+        order_preview_id=order_preview_id,
+        user_confirmed=user_confirmed,
+        confirmation_message=confirmation_message,
+        metadata=metadata or {},
+    )
+    response = _request_json(f"{CONFIG.execution_service_url}/executions", request.model_dump())
+    execution = TradeExecution(**response)
+    if execution.core_action_id:
+        _write_core_audit_event(
+            event_type="polymarket_trade_execution_evaluated",
+            action_id=execution.core_action_id,
+            user_id=execution.user_id or "unknown",
+            agent_id=execution.agent_id or "unknown",
+            policy_decision_id=execution.core_policy_decision_id,
+            payload={
+                "execution_id": execution.execution_id,
+                "order_preview_id": execution.order_preview_id,
+                "state": execution.state,
+                "execution_mode": execution.execution_mode,
+                "submitted_to_polymarket": execution.submitted_to_polymarket,
+                "reason": execution.reason,
+            },
+        )
+    return execution
+
+
+@MCP_SERVER.tool()
+def get_trade_execution(execution_id: str) -> TradeExecution:
+    """Fetch a stored dry-run/live execution evaluation."""
+    response = _request_json(f"{CONFIG.execution_service_url}/executions/{execution_id}")
+    return TradeExecution(**response)
+
+
+@MCP_SERVER.tool()
 def get_order_preview(order_preview_id: str) -> OrderPreview:
     """Fetch a stored non-executing order preview."""
     response = _request_json(f"{CONFIG.order_service_url}/order-previews/{order_preview_id}")
@@ -507,6 +550,7 @@ def polymarket_adapter_health() -> dict:
     opportunity = _request_json(f"{CONFIG.opportunity_service_url}/healthz")
     portfolio = _request_json(f"{CONFIG.portfolio_service_url}/healthz")
     order = _request_json(f"{CONFIG.order_service_url}/healthz")
+    execution = _request_json(f"{CONFIG.execution_service_url}/healthz")
     return {
         "service": "clink_polymarket_adapter",
         "status": "ok",
@@ -516,6 +560,7 @@ def polymarket_adapter_health() -> dict:
         "opportunity": opportunity,
         "portfolio": portfolio,
         "order": order,
+        "execution": execution,
     }
 
 

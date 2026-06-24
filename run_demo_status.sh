@@ -23,6 +23,7 @@ service_url() {
     polymarket_opportunity_service) printf "http://%s:%s" "${POLYMARKET_OPPORTUNITY_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_OPPORTUNITY_SERVICE_PORT:-8022}" ;;
     polymarket_portfolio_service) printf "http://%s:%s" "${POLYMARKET_PORTFOLIO_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_PORTFOLIO_SERVICE_PORT:-8023}" ;;
     polymarket_order_service) printf "http://%s:%s" "${POLYMARKET_ORDER_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_ORDER_SERVICE_PORT:-8024}" ;;
+    polymarket_execution_service) printf "http://%s:%s" "${POLYMARKET_EXECUTION_SERVICE_HOST:-127.0.0.1}" "${POLYMARKET_EXECUTION_SERVICE_PORT:-8025}" ;;
     polymarket_mcp_server) printf "http://%s:%s/mcp/" "${POLYMARKET_MCP_HOST:-127.0.0.1}" "${POLYMARKET_MCP_PORT:-9020}" ;;
     *) printf "-" ;;
   esac
