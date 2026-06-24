@@ -12,6 +12,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from services.market_service.schemas import SearchMarketsRequest, SearchMarketsResult  # noqa: E402
 from services.opportunity_service.schemas import ScoreOpportunitiesRequest, ScoreOpportunitiesResult  # noqa: E402
+from services.order_service.schemas import CreateOrderPreviewRequest, OrderPreview  # noqa: E402
 from services.portfolio_service.schemas import CreatePaperPositionRequest, PaperPosition, PortfolioSnapshot  # noqa: E402
 from services.trade_service.schemas import CreateTradeIntentRequest, TradeIntent  # noqa: E402
 from shared.config import AppConfig  # noqa: E402
@@ -281,6 +282,102 @@ def create_trade_intent(
 
 
 @MCP_SERVER.tool()
+def create_order_preview(
+    user_id: str,
+    market_id: str,
+    question: str,
+    amount_usdc: str,
+    limit_price: float,
+    agent_id: str = "external_agent",
+    outcome: str = "Yes",
+    side: str = "buy",
+    max_slippage_bps: int = 100,
+    authorization_id: str | None = None,
+    user_confirmed: bool = False,
+    metadata: dict | None = None,
+) -> OrderPreview:
+    """Create a non-executing live order preview that requires user confirmation before any future live execution."""
+    enriched_metadata = {
+        **(metadata or {}),
+        "market_id": market_id,
+        "question": question,
+        "outcome": outcome,
+        "side": side,
+        "adapter": "clink-polymarket",
+        "live_mode": True,
+        "preview_only": True,
+    }
+    core_action = _create_core_action_intent(
+        user_id=user_id,
+        agent_id=agent_id,
+        amount_usdc=amount_usdc,
+        market_id=market_id,
+        question=question,
+        metadata=enriched_metadata,
+    )
+    audit_requested = _write_core_audit_event(
+        event_type="polymarket_order_preview_requested",
+        action_id=core_action["action_id"],
+        user_id=user_id,
+        agent_id=agent_id,
+        payload=enriched_metadata,
+    )
+    core_policy = _evaluate_core_policy(
+        action_id=core_action["action_id"],
+        user_id=user_id,
+        agent_id=agent_id,
+        amount_usdc=amount_usdc,
+        market_id=market_id,
+        user_confirmed=user_confirmed,
+        live_mode=True,
+    )
+    audit_policy = _write_core_audit_event(
+        event_type="polymarket_order_preview_policy_evaluated",
+        action_id=core_action["action_id"],
+        user_id=user_id,
+        agent_id=agent_id,
+        policy_decision_id=core_policy.get("policy_decision_id"),
+        payload={
+            "approved": core_policy.get("approved"),
+            "decision": core_policy.get("decision"),
+            "reason_code": core_policy.get("reason_code"),
+        },
+    )
+    request = CreateOrderPreviewRequest(
+        user_id=user_id,
+        agent_id=agent_id,
+        market_id=market_id,
+        question=question,
+        outcome=outcome,
+        side=side,
+        amount_usdc=amount_usdc,
+        limit_price=limit_price,
+        max_slippage_bps=max_slippage_bps,
+        authorization_id=authorization_id,
+        core_action_id=core_action["action_id"],
+        core_policy_decision_id=core_policy.get("policy_decision_id"),
+        core_audit_event_ids=[
+            event_id
+            for event_id in [audit_requested.get("event_id"), audit_policy.get("event_id")]
+            if event_id
+        ],
+        core_policy_decision=core_policy,
+        requires_user_confirmation=True,
+        live_mode=True,
+        metadata=enriched_metadata,
+    )
+    response = _request_json(f"{CONFIG.order_service_url}/order-previews", request.model_dump())
+    return OrderPreview(**response)
+
+
+@MCP_SERVER.tool()
+def get_order_preview(order_preview_id: str) -> OrderPreview:
+    """Fetch a stored non-executing order preview."""
+    response = _request_json(f"{CONFIG.order_service_url}/order-previews/{order_preview_id}")
+    return OrderPreview(**response)
+
+
+@MCP_SERVER.tool()
 def create_paper_position(
     user_id: str,
     trade_intent_id: str,
@@ -409,6 +506,7 @@ def polymarket_adapter_health() -> dict:
     trade = _request_json(f"{CONFIG.trade_service_url}/healthz")
     opportunity = _request_json(f"{CONFIG.opportunity_service_url}/healthz")
     portfolio = _request_json(f"{CONFIG.portfolio_service_url}/healthz")
+    order = _request_json(f"{CONFIG.order_service_url}/healthz")
     return {
         "service": "clink_polymarket_adapter",
         "status": "ok",
@@ -417,6 +515,7 @@ def polymarket_adapter_health() -> dict:
         "trade": trade,
         "opportunity": opportunity,
         "portfolio": portfolio,
+        "order": order,
     }
 
 

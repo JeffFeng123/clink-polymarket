@@ -13,10 +13,13 @@ class AppConfig:
     polymarket_opportunity_service_port: int = 8022
     polymarket_portfolio_service_host: str = "127.0.0.1"
     polymarket_portfolio_service_port: int = 8023
+    polymarket_order_service_host: str = "127.0.0.1"
+    polymarket_order_service_port: int = 8024
     polymarket_mcp_host: str = "127.0.0.1"
     polymarket_mcp_port: int = 9020
     polymarket_trade_intent_file: str = "services/trade_service/trade_intents.jsonl"
     polymarket_position_file: str = "services/portfolio_service/positions.jsonl"
+    polymarket_order_preview_file: str = "services/order_service/order_previews.jsonl"
     clink_core_action_mcp_url: str = "http://127.0.0.1:9016/mcp/"
     clink_core_policy_mcp_url: str = "http://127.0.0.1:9015/mcp/"
     clink_core_audit_mcp_url: str = "http://127.0.0.1:9017/mcp/"
@@ -36,6 +39,8 @@ class AppConfig:
             polymarket_opportunity_service_port=int(os.getenv("POLYMARKET_OPPORTUNITY_SERVICE_PORT", "8022")),
             polymarket_portfolio_service_host=os.getenv("POLYMARKET_PORTFOLIO_SERVICE_HOST", "127.0.0.1"),
             polymarket_portfolio_service_port=int(os.getenv("POLYMARKET_PORTFOLIO_SERVICE_PORT", "8023")),
+            polymarket_order_service_host=os.getenv("POLYMARKET_ORDER_SERVICE_HOST", "127.0.0.1"),
+            polymarket_order_service_port=int(os.getenv("POLYMARKET_ORDER_SERVICE_PORT", "8024")),
             polymarket_mcp_host=os.getenv("POLYMARKET_MCP_HOST", "127.0.0.1"),
             polymarket_mcp_port=int(os.getenv("POLYMARKET_MCP_PORT", "9020")),
             polymarket_trade_intent_file=os.getenv(
@@ -45,6 +50,10 @@ class AppConfig:
             polymarket_position_file=os.getenv(
                 "POLYMARKET_POSITION_FILE",
                 "services/portfolio_service/positions.jsonl",
+            ),
+            polymarket_order_preview_file=os.getenv(
+                "POLYMARKET_ORDER_PREVIEW_FILE",
+                "services/order_service/order_previews.jsonl",
             ),
             clink_core_action_mcp_url=os.getenv("CLINK_CORE_ACTION_MCP_URL", "http://127.0.0.1:9016/mcp/"),
             clink_core_policy_mcp_url=os.getenv("CLINK_CORE_POLICY_MCP_URL", "http://127.0.0.1:9015/mcp/"),
@@ -72,6 +81,10 @@ class AppConfig:
     @property
     def portfolio_service_url(self) -> str:
         return f"http://{self.polymarket_portfolio_service_host}:{self.polymarket_portfolio_service_port}"
+
+    @property
+    def order_service_url(self) -> str:
+        return f"http://{self.polymarket_order_service_host}:{self.polymarket_order_service_port}"
 
     @property
     def polymarket_mcp_url(self) -> str:

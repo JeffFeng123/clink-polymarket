@@ -59,6 +59,7 @@ start_service "polymarket_market_service" python3 services/market_service/app.py
 start_service "polymarket_trade_service" python3 services/trade_service/app.py
 start_service "polymarket_opportunity_service" python3 services/opportunity_service/app.py
 start_service "polymarket_portfolio_service" python3 services/portfolio_service/app.py
+start_service "polymarket_order_service" python3 services/order_service/app.py
 start_service "polymarket_mcp_server" python3 mcp_servers/polymarket_server.py
 
 echo

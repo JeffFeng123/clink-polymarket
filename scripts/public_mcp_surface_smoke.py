@@ -37,6 +37,23 @@ async def main() -> None:
                     },
                 )
             )
+            selected = opportunities["opportunities"][0]
+            order_preview = _content_to_dict(
+                await session.call_tool(
+                    "create_order_preview",
+                    arguments={
+                        "user_id": "public-mcp-smoke-user",
+                        "agent_id": "hermes_like_external_agent",
+                        "market_id": selected["market_id"],
+                        "question": selected["question"],
+                        "outcome": selected.get("outcome", "Yes"),
+                        "side": "buy",
+                        "amount_usdc": "1",
+                        "limit_price": selected["price"],
+                        "max_slippage_bps": 100,
+                    },
+                )
+            )
             flow = _content_to_dict(
                 await session.call_tool(
                     "submit_agent_trade_intent",
@@ -60,6 +77,7 @@ async def main() -> None:
                     {
                         "health": health,
                         "opportunities": opportunities,
+                        "order_preview": order_preview,
                         "agent_flow": flow,
                         "portfolio": portfolio,
                     },

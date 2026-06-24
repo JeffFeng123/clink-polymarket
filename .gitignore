@@ -19,6 +19,7 @@ env/
 .demo_runtime/
 services/trade_service/trade_intents.jsonl
 services/portfolio_service/positions.jsonl
+services/order_service/order_previews.jsonl
 
 # Tooling caches
 .pytest_cache/
