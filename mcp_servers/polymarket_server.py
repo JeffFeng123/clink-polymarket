@@ -149,8 +149,13 @@ def score_market_opportunities(
     """Score candidate markets so any external agent can decide what to inspect or trade."""
     candidate_markets = markets
     if candidate_markets is None:
-        search = search_prediction_markets(query=query or goal, limit=limit, min_liquidity=min_liquidity)
+        # Natural-language goals are often full sentences. Keep them for scoring,
+        # but do not use them as exact market-search filters unless explicitly requested.
+        search = search_prediction_markets(query=query, limit=limit, min_liquidity=min_liquidity)
         candidate_markets = [market.model_dump() for market in search.markets]
+        if not candidate_markets and query:
+            fallback = search_prediction_markets(query=None, limit=limit, min_liquidity=min_liquidity)
+            candidate_markets = [market.model_dump() for market in fallback.markets]
     request = ScoreOpportunitiesRequest(
         markets=candidate_markets,
         goal=goal or query,

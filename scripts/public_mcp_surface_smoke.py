@@ -15,7 +15,10 @@ from shared.config import AppConfig  # noqa: E402
 
 def _content_to_dict(result) -> dict:
     text = getattr(result.content[0], "text", "{}")
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"MCP tool returned non-JSON content: {text}") from exc
 
 
 async def main() -> None:
