@@ -17,7 +17,7 @@ class PolymarketMarketService:
         source_detail = None
         try:
             events, source_detail = self._fetch_active_events(request)
-            markets = self._normalize_events(events, request)
+            markets = self._normalize_events(events, self._normalization_limit(request))
             source = "polymarket_gamma_api"
             if not markets:
                 source_detail = source_detail or "Gamma API returned no normalizable markets."
@@ -25,13 +25,12 @@ class PolymarketMarketService:
             markets = self._mock_markets(request)
             source = "mock_fallback"
             source_detail = f"Gamma API fallback reason: {type(exc).__name__}: {exc}"
+
+        normalized_count = len(markets)
         if request.query:
-            needle = request.query.lower()
-            markets = [
-                market
-                for market in markets
-                if needle in market.question.lower() or needle in (market.event_title or "").lower()
-            ]
+            markets = self._filter_markets_by_query(markets, request.query)
+            detail = f"Normalized {normalized_count} markets; query filter matched {len(markets)}."
+            source_detail = f"{source_detail} {detail}" if source_detail else detail
         if request.min_liquidity is not None:
             markets = [market for market in markets if (market.liquidity or 0) >= request.min_liquidity]
         markets = markets[: max(1, min(request.limit, 100))]
@@ -43,13 +42,27 @@ class PolymarketMarketService:
             count=len(markets),
         )
 
+    @staticmethod
+    def _requested_limit(request: SearchMarketsRequest) -> int:
+        return max(1, min(request.limit, 100))
+
+    def _event_fetch_limit(self, request: SearchMarketsRequest) -> int:
+        if not request.query:
+            return self._requested_limit(request)
+        return max(self._requested_limit(request), min(100, self._requested_limit(request) * 20))
+
+    def _normalization_limit(self, request: SearchMarketsRequest) -> int:
+        if not request.query:
+            return self._requested_limit(request)
+        return max(self._requested_limit(request), min(100, self._requested_limit(request) * 20))
+
     def _fetch_active_events(self, request: SearchMarketsRequest) -> tuple[list[dict[str, Any]], str]:
         params: dict[str, str] = {
             "active": "true",
             "closed": "false",
             "order": "volume_24hr",
             "ascending": "false",
-            "limit": str(max(1, min(request.limit, 100))),
+            "limit": str(self._event_fetch_limit(request)),
         }
         if request.tag_id:
             params["tag_id"] = request.tag_id
@@ -86,7 +99,7 @@ class PolymarketMarketService:
                 return [item for item in value if isinstance(item, dict)]
         return []
 
-    def _normalize_events(self, events: list[dict[str, Any]], request: SearchMarketsRequest) -> list[PredictionMarket]:
+    def _normalize_events(self, events: list[dict[str, Any]], limit: int) -> list[PredictionMarket]:
         normalized: list[PredictionMarket] = []
         for event in events:
             event_id = self._first_text(event, ["id", "event_id"])
@@ -102,9 +115,21 @@ class PolymarketMarketService:
                     normalized.append(self._normalize_market(market, event_id, event_title, event_slug))
                 except Exception:
                     continue
-                if len(normalized) >= request.limit:
+                if len(normalized) >= limit:
                     return normalized
         return normalized
+
+    def _filter_markets_by_query(self, markets: list[PredictionMarket], query: str) -> list[PredictionMarket]:
+        needle = query.strip().lower()
+        tokens = [token for token in needle.replace("/", " ").replace("-", " ").split() if len(token) >= 2]
+        filtered: list[PredictionMarket] = []
+        for market in markets:
+            haystack = f"{market.question} {market.event_title or ''} {market.slug or ''}".lower()
+            if needle and needle in haystack:
+                filtered.append(market)
+            elif tokens and all(token in haystack for token in tokens):
+                filtered.append(market)
+        return filtered
 
     def _extract_event_markets(self, event: dict[str, Any]) -> list[dict[str, Any]]:
         raw_markets = event.get("markets")

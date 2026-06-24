@@ -49,7 +49,7 @@ def main() -> None:
 
     result = service._normalize_events(
         [event_with_json_string_markets, direct_event_market],
-        SearchMarketsRequest(limit=5),
+        limit=5,
     )
 
     assert len(result) == 2
@@ -63,7 +63,48 @@ def main() -> None:
     assert result[1].market_id == "999"
     assert result[1].best_yes_price == 0.22
 
-    print(json.dumps({"status": "ok", "count": len(result), "first_market": result[0].to_dict()}, indent=2))
+
+    deep_events = [
+        {
+            "id": str(index),
+            "slug": f"generic-event-{index}",
+            "title": f"Generic market {index}",
+            "markets": [
+                {
+                    "id": str(2000 + index),
+                    "conditionId": f"0xgeneric{index}",
+                    "question": f"Will generic event {index} happen?",
+                    "slug": f"generic-market-{index}",
+                    "outcomes": ["Yes", "No"],
+                    "outcomePrices": [0.5, 0.5],
+                }
+            ],
+        }
+        for index in range(4)
+    ]
+    deep_events.append(
+        {
+            "id": "target-event",
+            "slug": "agentic-payment-target",
+            "title": "Agentic payment adoption",
+            "markets": [
+                {
+                    "id": "target-market",
+                    "conditionId": "0xtarget",
+                    "question": "Will agentic payment adoption accelerate in 2026?",
+                    "slug": "agentic-payment-adoption-2026",
+                    "outcomes": ["Yes", "No"],
+                    "outcomePrices": [0.44, 0.56],
+                }
+            ],
+        }
+    )
+    service._fetch_active_events = lambda request: (deep_events, "test fetch")
+    searched = service.search_markets(SearchMarketsRequest(query="agentic payment", limit=1))
+    assert searched.count == 1
+    assert searched.markets[0].market_id == "target-market"
+
+    print(json.dumps({"status": "ok", "count": len(result), "first_market": result[0].to_dict(), "searched_market": searched.markets[0].to_dict()}, indent=2))
 
 
 if __name__ == "__main__":
