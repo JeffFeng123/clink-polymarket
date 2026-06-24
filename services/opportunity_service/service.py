@@ -32,8 +32,11 @@ class OpportunityService:
         reasons: list[str] = []
 
         if liquidity is None:
-            score -= 5
+            score -= 35
             reasons.append("missing_liquidity")
+        elif liquidity <= 0:
+            score -= 45
+            reasons.append("no_liquidity")
         elif liquidity >= 10000:
             score += 25
             reasons.append("deep_liquidity")
@@ -58,8 +61,11 @@ class OpportunityService:
             reasons.append("low_recent_volume")
 
         if price is None:
-            score -= 10
+            score -= 40
             reasons.append("missing_price")
+        elif price <= 0 or price >= 1:
+            score -= 50
+            reasons.append("non_tradable_price")
         elif request.preferred_price_min <= price <= request.preferred_price_max:
             score += 20
             reasons.append("tradable_price_range")
@@ -75,11 +81,18 @@ class OpportunityService:
             reasons.append("goal_keyword_match")
 
         if market.get("closed") or market.get("active") is False:
-            score -= 40
+            score -= 50
             reasons.append("inactive_or_closed")
 
+        untradable = any(
+            reason in reasons
+            for reason in ["missing_price", "non_tradable_price", "missing_liquidity", "no_liquidity", "inactive_or_closed"]
+        )
         score = max(0, min(100, score))
-        if score >= 70:
+        if untradable:
+            risk_level = "high"
+            action = "reject"
+        elif score >= 70:
             risk_level = "low"
             action = "paper_trade"
         elif score >= 45:

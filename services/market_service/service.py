@@ -31,6 +31,11 @@ class PolymarketMarketService:
             markets = self._filter_markets_by_query(markets, request.query)
             detail = f"Normalized {normalized_count} markets; query filter matched {len(markets)}."
             source_detail = f"{source_detail} {detail}" if source_detail else detail
+        if request.tradable_only:
+            before_tradable_filter = len(markets)
+            markets = [market for market in markets if self._is_tradable_market(market)]
+            detail = f"tradable_only matched {len(markets)} of {before_tradable_filter}."
+            source_detail = f"{source_detail} {detail}" if source_detail else detail
         if request.min_liquidity is not None:
             markets = [market for market in markets if (market.liquidity or 0) >= request.min_liquidity]
         markets = markets[: max(1, min(request.limit, 100))]
@@ -130,6 +135,16 @@ class PolymarketMarketService:
             elif tokens and all(token in haystack for token in tokens):
                 filtered.append(market)
         return filtered
+
+    @staticmethod
+    def _is_tradable_market(market: PredictionMarket) -> bool:
+        if not market.active or market.closed:
+            return False
+        if market.best_yes_price is None or market.best_yes_price <= 0 or market.best_yes_price >= 1:
+            return False
+        if market.liquidity is None or market.liquidity <= 0:
+            return False
+        return True
 
     def _extract_event_markets(self, event: dict[str, Any]) -> list[dict[str, Any]]:
         raw_markets = event.get("markets")

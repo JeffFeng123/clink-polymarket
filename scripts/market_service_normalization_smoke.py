@@ -8,6 +8,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from services.market_service.schemas import SearchMarketsRequest
 from services.market_service.service import PolymarketMarketService
+from services.opportunity_service.schemas import ScoreOpportunitiesRequest
+from services.opportunity_service.service import OpportunityService
 
 
 def main() -> None:
@@ -104,7 +106,76 @@ def main() -> None:
     assert searched.count == 1
     assert searched.markets[0].market_id == "target-market"
 
-    print(json.dumps({"status": "ok", "count": len(result), "first_market": result[0].to_dict(), "searched_market": searched.markets[0].to_dict()}, indent=2))
+
+    tradable_events = [
+        {
+            "id": "tradable-event",
+            "slug": "tradable-event",
+            "title": "Tradable event",
+            "markets": [
+                {
+                    "id": "null-price",
+                    "question": "Null price market?",
+                    "slug": "null-price-market",
+                    "outcomes": ["Yes", "No"],
+                    "outcomePrices": [],
+                    "liquidity": "1000",
+                },
+                {
+                    "id": "zero-price",
+                    "question": "Zero price market?",
+                    "slug": "zero-price-market",
+                    "outcomes": ["Yes", "No"],
+                    "outcomePrices": [0, 1],
+                    "liquidity": "1000",
+                },
+                {
+                    "id": "no-liquidity",
+                    "question": "No liquidity market?",
+                    "slug": "no-liquidity-market",
+                    "outcomes": ["Yes", "No"],
+                    "outcomePrices": [0.4, 0.6],
+                    "liquidity": "0",
+                },
+                {
+                    "id": "tradable-market",
+                    "question": "Tradable Kraken market?",
+                    "slug": "tradable-kraken-market",
+                    "outcomes": ["Yes", "No"],
+                    "outcomePrices": [0.37, 0.63],
+                    "liquidity": "4100",
+                },
+            ],
+        }
+    ]
+    service._fetch_active_events = lambda request: (tradable_events, "tradable test fetch")
+    tradable = service.search_markets(SearchMarketsRequest(query="market", limit=10, tradable_only=True))
+    assert tradable.count == 1
+    assert tradable.markets[0].market_id == "tradable-market"
+
+    scores = OpportunityService().score_opportunities(
+        ScoreOpportunitiesRequest(
+            markets=[market.to_dict() for market in service._normalize_events(tradable_events, limit=10)],
+            max_results=10,
+        )
+    )
+    by_id = {item.market_id: item for item in scores.opportunities}
+    assert by_id["tradable-market"].recommended_action in {"paper_trade", "watch"}
+    assert by_id["zero-price"].recommended_action == "reject"
+    assert by_id["no-liquidity"].recommended_action == "reject"
+
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "count": len(result),
+                "first_market": result[0].to_dict(),
+                "searched_market": searched.markets[0].to_dict(),
+                "tradable_market": tradable.markets[0].to_dict(),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

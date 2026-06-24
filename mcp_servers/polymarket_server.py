@@ -130,9 +130,16 @@ def search_prediction_markets(
     limit: int = 10,
     min_liquidity: float | None = None,
     tag_id: str | None = None,
+    tradable_only: bool = False,
 ) -> SearchMarketsResult:
     """Search active Polymarket prediction markets. Read-only."""
-    request = SearchMarketsRequest(query=query, limit=limit, min_liquidity=min_liquidity, tag_id=tag_id)
+    request = SearchMarketsRequest(
+        query=query,
+        limit=limit,
+        min_liquidity=min_liquidity,
+        tag_id=tag_id,
+        tradable_only=tradable_only,
+    )
     response = _request_json(f"{CONFIG.market_service_url}/markets/search", request.model_dump())
     return SearchMarketsResult(**response)
 
@@ -144,6 +151,7 @@ def score_market_opportunities(
     limit: int = 10,
     max_results: int = 5,
     min_liquidity: float | None = None,
+    tradable_only: bool = True,
     markets: list[dict] | None = None,
 ) -> ScoreOpportunitiesResult:
     """Score candidate markets so any external agent can decide what to inspect or trade."""
@@ -151,10 +159,20 @@ def score_market_opportunities(
     if candidate_markets is None:
         # Natural-language goals are often full sentences. Keep them for scoring,
         # but do not use them as exact market-search filters unless explicitly requested.
-        search = search_prediction_markets(query=query, limit=limit, min_liquidity=min_liquidity)
+        search = search_prediction_markets(
+            query=query,
+            limit=limit,
+            min_liquidity=min_liquidity,
+            tradable_only=tradable_only,
+        )
         candidate_markets = [market.model_dump() for market in search.markets]
         if not candidate_markets and query:
-            fallback = search_prediction_markets(query=None, limit=limit, min_liquidity=min_liquidity)
+            fallback = search_prediction_markets(
+                query=None,
+                limit=limit,
+                min_liquidity=min_liquidity,
+                tradable_only=tradable_only,
+            )
             candidate_markets = [market.model_dump() for market in fallback.markets]
     request = ScoreOpportunitiesRequest(
         markets=candidate_markets,

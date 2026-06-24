@@ -6,6 +6,7 @@ class SearchMarketsRequest(BaseModel):
     limit: int = 10
     min_liquidity: float | None = None
     tag_id: str | None = None
+    tradable_only: bool = False
 
 
 class PredictionMarket(BaseModel):
