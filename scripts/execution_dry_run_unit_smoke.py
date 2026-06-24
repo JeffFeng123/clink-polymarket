@@ -44,6 +44,9 @@ def main() -> None:
         )
 
         service = ExecutionService()
+        service._fetch_order_preview = lambda order_preview_id: (
+            preview if order_preview_id == preview.order_preview_id else None
+        )
         blocked = service.execute_approved_trade(
             ExecuteApprovedTradeRequest(order_preview_id=preview.order_preview_id, user_confirmed=False)
         )
