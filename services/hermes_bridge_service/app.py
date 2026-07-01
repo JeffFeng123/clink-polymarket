@@ -1,10 +1,12 @@
 import argparse
 import json
+import logging
 import os
 import re
 import shlex
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,7 @@ from mcp_servers.polymarket_server import get_order_preview  # noqa: E402
 from shared.config import AppConfig  # noqa: E402
 
 APP_CONFIG = AppConfig.from_env()
+LOGGER = logging.getLogger("clink_hermes_bridge")
 
 
 class HermesMessageRequest(BaseModel):
@@ -72,29 +75,59 @@ def _load_preview(preview_id: str | None) -> dict | None:
         return None
 
 
-def _build_prompt(request: HermesMessageRequest) -> str:
+def _is_placeholder_message(message: str) -> bool:
+    normalized = message.strip().lower()
+    return normalized in {"", "...", "…", "。。。", "[...]", "[... ]"}
+
+
+def _agent_messages(parsed: dict | None, output: str) -> list[str]:
+    if isinstance(parsed, dict) and isinstance(parsed.get("agent_messages"), list):
+        messages = [str(item).strip() for item in parsed["agent_messages"]]
+        messages = [message for message in messages if not _is_placeholder_message(message)]
+        if messages:
+            return messages
+        return [
+            "Hermes returned a placeholder response instead of a final answer. "
+            "The bridge received the response; check raw_hermes_output in the API response or clink_hermes_bridge.log."
+        ]
+    if output.strip():
+        return [output[-4000:]]
+    return ["Hermes returned no output."]
+
+
+def _build_prompt(request: HermesMessageRequest, request_id: str) -> str:
     return f"""
 You are Hermes Agent operating inside Clink x Hermes Mission Control.
 
+Bridge request_id: {request_id}
 User request:
 {request.message}
 
-Required behavior:
-1. Use the clink_polymarket MCP tools, not manual HTTP calls.
-2. Search/score tradable Polymarket opportunities relevant to the request.
-3. Create a Clink order preview only. Do not execute a live trade.
-4. Use amount_usdc={request.amount_usdc} unless the user asked for a smaller amount.
-5. Return a concise explanation plus a final JSON object with these keys when available:
-   bridge_mode, status, agent_messages, selected_opportunity, order_preview_id.
-6. Never call execute_approved_trade from this chat turn.
+Routing rules:
+1. If the user is greeting you, asking who you are, or asking a non-trading question, answer directly. Do not call tools.
+2. If the user asks to find a Polymarket opportunity or create an order preview, use the clink_polymarket MCP tools, not manual HTTP calls.
+3. For trading requests, search/score tradable Polymarket opportunities relevant to the request and create a Clink order preview only. Do not execute a live trade.
+4. For trading requests, use amount_usdc={request.amount_usdc} unless the user asked for a smaller amount.
+5. Never call execute_approved_trade from this chat turn.
+6. Do not return placeholder text such as ... or [...].
 
-Final JSON shape:
+Return a concise natural-language answer plus a final JSON object.
+For normal chat, use this shape with real content:
+{{
+  "bridge_mode": "hermes_cli",
+  "status": "chat_response",
+  "agent_messages": ["我是 Hermes，已经连接到 Clink 控制台。你可以让我寻找 Polymarket 机会或创建订单预览。"],
+  "selected_opportunity": null,
+  "order_preview_id": null
+}}
+
+For trading preview creation, use this shape with real content:
 {{
   "bridge_mode": "hermes_cli",
   "status": "preview_created",
-  "agent_messages": ["..."],
-  "selected_opportunity": {{"market_id": "...", "question": "..."}},
-  "order_preview_id": "preview_xxx"
+  "agent_messages": ["已找到一个可交易市场，并创建了 Clink order preview，等待你在控制台输入 LIVE 确认。"],
+  "selected_opportunity": {{"market_id": "691547", "question": "Kraken IPO by December 31, 2026?"}},
+  "order_preview_id": "preview_actual_id"
 }}
 """.strip()
 
@@ -144,7 +177,9 @@ def create_app() -> FastAPI:
 
     @app.post("/message")
     def message(request: HermesMessageRequest) -> dict:
-        prompt = _build_prompt(request)
+        request_id = f"hmsg_{uuid.uuid4().hex[:12]}"
+        LOGGER.info("received request_id=%s source=%s message_chars=%s", request_id, request.source, len(request.message))
+        prompt = _build_prompt(request, request_id)
         try:
             hermes = _run_hermes(prompt)
         except subprocess.TimeoutExpired as exc:
@@ -159,19 +194,27 @@ def create_app() -> FastAPI:
         preview_id = preview_id or _extract_preview_id(hermes["output"])
         preview = _load_preview(preview_id)
 
-        agent_messages = []
-        if isinstance(parsed, dict) and isinstance(parsed.get("agent_messages"), list):
-            agent_messages = [str(item) for item in parsed["agent_messages"]]
-        if not agent_messages:
-            agent_messages = [hermes["output"][-4000:] if hermes["output"] else "Hermes returned no output."]
+        agent_messages = _agent_messages(parsed, hermes["output"])
         if preview:
             agent_messages.append(f"Loaded Clink order preview: {preview.get('order_preview_id')}")
 
         parsed_status = (parsed or {}).get("status") if isinstance(parsed, dict) else None
+        LOGGER.info(
+            "completed request_id=%s returncode=%s output_chars=%s status=%s preview_id=%s",
+            request_id,
+            hermes["returncode"],
+            len(hermes["output"]),
+            parsed_status or "hermes_completed",
+            preview_id,
+        )
         return {
+            "request_id": request_id,
+            "hermes_received": True,
             "bridge_mode": "hermes_cli",
             "status": "preview_created" if preview else parsed_status or "hermes_completed",
             "returncode": hermes["returncode"],
+            "hermes_returncode": hermes["returncode"],
+            "raw_hermes_output_length": len(hermes["output"]),
             "agent_messages": agent_messages,
             "selected_opportunity": (parsed or {}).get("selected_opportunity") if isinstance(parsed, dict) else None,
             "order_preview": preview,
@@ -192,6 +235,7 @@ def main() -> None:
     if args.sample:
         print(json.dumps({"service": "clink_hermes_bridge_service", "status": "ok", "mode": "hermes_cli"}, indent=2))
         return
+    logging.basicConfig(level=os.getenv("HERMES_BRIDGE_LOG_LEVEL", "INFO"))
     uvicorn.run(app, host=APP_CONFIG.hermes_bridge_host, port=APP_CONFIG.hermes_bridge_port)
 
 

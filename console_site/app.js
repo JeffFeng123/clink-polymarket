@@ -135,6 +135,13 @@ async function handleTask(event) {
       body: JSON.stringify({ message, amount_usdc: amount, user_id: 'console-user', agent_id: 'hermes_console_agent' }),
     });
     (payload.agent_messages || ['Hermes returned a response.']).forEach((line) => addBubble(line, 'agent'));
+    if (payload.bridge_mode === 'hermes_cli') {
+      addTimeline(
+        'Hermes bridge ack',
+        `${payload.request_id || 'no-request-id'} · return=${payload.hermes_returncode ?? payload.returncode ?? 'unknown'} · output=${payload.raw_hermes_output_length ?? 0} chars`,
+        payload.hermes_received ? 'good' : 'warn',
+      );
+    }
     if (payload.hermes_bridge_error) addBubble(`Hermes bridge failed, local fallback used: ${payload.hermes_bridge_error}`, 'system');
     if (payload.order_preview) renderPreview(payload.order_preview);
     if (payload.selected_opportunity) addTimeline('Opportunity selected', payload.selected_opportunity.question || payload.selected_opportunity.market_id, 'good');
