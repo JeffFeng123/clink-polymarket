@@ -62,9 +62,11 @@ start_service "polymarket_portfolio_service" python3 services/portfolio_service/
 start_service "polymarket_order_service" python3 services/order_service/app.py
 start_service "polymarket_execution_service" python3 services/execution_service/app.py
 start_service "polymarket_mcp_server" python3 mcp_servers/polymarket_server.py
+start_service "clink_hermes_console" python3 services/console_api/app.py
 
 echo
 echo "Clink Polymarket public MCP surface is ready."
+echo "Clink x Hermes Mission Control is running at http://${CONSOLE_API_HOST:-0.0.0.0}:${CONSOLE_API_PORT:-8030}"
 echo "Run: python3 scripts/polymarket_readonly_smoke.py"
 echo "Run: python3 scripts/public_mcp_surface_smoke.py"
 echo "Use bash run_demo_stop.sh to stop the backgrounded demo safely."

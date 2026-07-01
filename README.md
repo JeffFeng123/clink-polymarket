@@ -66,6 +66,42 @@ flowchart LR
     CORE --> TRADE
 ```
 
+
+## Clink x Hermes Mission Control
+
+This adapter also ships a browser console for Hermes-driven trading workflows:
+
+```text
+User -> Clink Console -> Hermes bridge / local MCP runner -> clink-polymarket tools -> clink-core gates -> Polymarket execution
+```
+
+The console is intentionally not just a config form. It shows:
+
+- Hermes tasking chat.
+- Live readiness and service health.
+- Current order preview, token id, policy decision, and audit context.
+- A human LIVE launch gate before real Polymarket submission.
+- Execution result with order id / tx hash when available.
+
+By default, if `HERMES_AGENT_HTTP_URL` is empty, the console uses a Hermes-compatible local MCP runner that calls the same public tool flow Hermes sees. If a Hermes HTTP bridge is available, set:
+
+```env
+HERMES_AGENT_HTTP_URL=http://127.0.0.1:<hermes-bridge-port>
+```
+
+Console URL when running the demo:
+
+```text
+http://<public-ip>:8030
+```
+
+Live submission remains locked unless the console sends both flags:
+
+```text
+user_confirmed=true
+live_submission_confirmed=true
+```
+
 ## MCP Tools
 
 | Tool | Purpose |
@@ -117,6 +153,7 @@ polymarket_portfolio_service    8023
 polymarket_order_service        8024
 polymarket_execution_service    8025
 polymarket_mcp_server           9020
+clink_hermes_console            8030
 ```
 
 Smoke test:
@@ -124,6 +161,7 @@ Smoke test:
 ```bash
 python3 scripts/polymarket_readonly_smoke.py
 python3 scripts/public_mcp_surface_smoke.py
+python3 services/console_api/app.py --sample
 ```
 
 Live execution configuration:
@@ -183,6 +221,8 @@ services/trade_service/         paper trade intent / order preview
 services/portfolio_service/     paper positions / portfolio / PnL
 services/order_service/         non-executing order previews
 services/execution_service/     dry-run gate / live CLOB limit-order submission
+services/console_api/           Clink x Hermes Mission Control API and static site
+console_site/                   Mission Control frontend
 mcp_servers/                    Polymarket MCP adapter
 scripts/                        smoke tests
 shared/                         config

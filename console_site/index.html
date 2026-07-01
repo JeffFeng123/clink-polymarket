@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clink x Hermes Mission Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="orbital-bg">
+      <div class="grid"></div>
+      <div class="orbital-ring ring-a"></div>
+      <div class="orbital-ring ring-b"></div>
+      <div class="glow glow-green"></div>
+      <div class="glow glow-blue"></div>
+    </div>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Clink x Hermes</p>
+          <h1>Mission Control</h1>
+        </div>
+        <div class="status-cluster">
+          <div class="status-pill" id="livePill"><span></span>Checking live readiness</div>
+          <div class="status-pill ghost" id="bridgePill"><span></span>Hermes bridge</div>
+        </div>
+      </header>
+
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Agentic Trading Control Plane</p>
+          <h2 id="headline">Hermes can propose. Clink controls launch.</h2>
+          <p class="hero-copy">Search markets, create governed previews, then require human LIVE confirmation before Polymarket submission.</p>
+        </div>
+        <div class="launch-ring">
+          <div class="launch-core" id="launchCore">SAFE</div>
+        </div>
+      </section>
+
+      <section class="mission-layout">
+        <aside class="panel chat-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Hermes Channel</p>
+              <h3>Agent Tasking</h3>
+            </div>
+            <button class="small-btn" id="refreshBtn">Refresh</button>
+          </div>
+
+          <div class="chat-feed" id="chatFeed">
+            <div class="bubble system">Console online. Ask Hermes to find a trade opportunity, then inspect the Clink preview before launch.</div>
+          </div>
+
+          <form class="task-form" id="taskForm">
+            <textarea id="messageInput" rows="4">Find a liquid Kraken IPO prediction market and create a 1 USDC order preview.</textarea>
+            <div class="form-row">
+              <input id="amountInput" value="1" aria-label="Amount USDC" />
+              <button type="submit">Send to Hermes</button>
+            </div>
+          </form>
+        </aside>
+
+        <section class="panel control-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Clink Control</p>
+              <h3>Live Execution Gate</h3>
+            </div>
+            <div class="mono mini" id="clock">--:--:-- UTC</div>
+          </div>
+
+          <div class="readiness-grid" id="readinessGrid"></div>
+
+          <div class="preview-card" id="previewCard">
+            <p class="eyebrow">Current Preview</p>
+            <h4>No order preview yet</h4>
+            <p class="muted">Ask Hermes to create a preview. The live button remains locked until a preview has a token_id.</p>
+          </div>
+
+          <div class="execute-box">
+            <div>
+              <p class="eyebrow danger">Live Launch</p>
+              <h4>Type LIVE to submit to Polymarket</h4>
+              <p class="muted">This calls <code>execute_approved_trade</code> with both confirmation flags enabled.</p>
+            </div>
+            <div class="execute-controls">
+              <input id="livePhrase" placeholder="Type LIVE" />
+              <button id="executeBtn" disabled>Execute Live Trade</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Audit Orbit</p>
+            <h3>Action Timeline</h3>
+          </div>
+          <div class="mono mini" id="lastExecution">No execution</div>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

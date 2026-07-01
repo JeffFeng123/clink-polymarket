@@ -19,6 +19,8 @@ class AppConfig:
     polymarket_execution_service_port: int = 8025
     polymarket_mcp_host: str = "127.0.0.1"
     polymarket_mcp_port: int = 9020
+    console_api_host: str = "0.0.0.0"
+    console_api_port: int = 8030
     polymarket_trade_intent_file: str = "services/trade_service/trade_intents.jsonl"
     polymarket_position_file: str = "services/portfolio_service/positions.jsonl"
     polymarket_order_preview_file: str = "services/order_service/order_previews.jsonl"
@@ -59,6 +61,8 @@ class AppConfig:
             polymarket_execution_service_port=int(os.getenv("POLYMARKET_EXECUTION_SERVICE_PORT", "8025")),
             polymarket_mcp_host=os.getenv("POLYMARKET_MCP_HOST", "127.0.0.1"),
             polymarket_mcp_port=int(os.getenv("POLYMARKET_MCP_PORT", "9020")),
+            console_api_host=os.getenv("CONSOLE_API_HOST", "0.0.0.0"),
+            console_api_port=int(os.getenv("CONSOLE_API_PORT", "8030")),
             polymarket_trade_intent_file=os.getenv(
                 "POLYMARKET_TRADE_INTENT_FILE",
                 "services/trade_service/trade_intents.jsonl",
@@ -96,6 +100,10 @@ class AppConfig:
 
     def describe(self) -> dict:
         return asdict(self)
+
+    @property
+    def console_api_url(self) -> str:
+        return f"http://{self.console_api_host}:{self.console_api_port}"
 
     @property
     def market_service_url(self) -> str:
