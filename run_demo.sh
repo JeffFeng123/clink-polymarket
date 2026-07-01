@@ -38,6 +38,12 @@ if [ -f ".env" ]; then
   set +a
 fi
 
+if [ -z "${PYTHON_BIN:-}" ] && [ -n "${CONDA_PREFIX:-}" ] && [ -x "$CONDA_PREFIX/bin/python3" ]; then
+  PYTHON_BIN="$CONDA_PREFIX/bin/python3"
+fi
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+echo "Using Python: $("$PYTHON_BIN" -c 'import sys; print(sys.executable)')"
+
 start_service() {
   local name="$1"
   shift
@@ -55,24 +61,24 @@ start_service() {
   fi
 }
 
-start_service "polymarket_market_service" python3 services/market_service/app.py
-start_service "polymarket_trade_service" python3 services/trade_service/app.py
-start_service "polymarket_opportunity_service" python3 services/opportunity_service/app.py
-start_service "polymarket_portfolio_service" python3 services/portfolio_service/app.py
-start_service "polymarket_order_service" python3 services/order_service/app.py
-start_service "polymarket_execution_service" python3 services/execution_service/app.py
-start_service "polymarket_mcp_server" python3 mcp_servers/polymarket_server.py
+start_service "polymarket_market_service" "$PYTHON_BIN" services/market_service/app.py
+start_service "polymarket_trade_service" "$PYTHON_BIN" services/trade_service/app.py
+start_service "polymarket_opportunity_service" "$PYTHON_BIN" services/opportunity_service/app.py
+start_service "polymarket_portfolio_service" "$PYTHON_BIN" services/portfolio_service/app.py
+start_service "polymarket_order_service" "$PYTHON_BIN" services/order_service/app.py
+start_service "polymarket_execution_service" "$PYTHON_BIN" services/execution_service/app.py
+start_service "polymarket_mcp_server" "$PYTHON_BIN" mcp_servers/polymarket_server.py
 
 if [ -z "${HERMES_BRIDGE_WORKDIR:-}" ]; then
   export HERMES_BRIDGE_WORKDIR="$ROOT_DIR"
 fi
-start_service "clink_hermes_bridge" python3 services/hermes_bridge_service/app.py
+start_service "clink_hermes_bridge" "$PYTHON_BIN" services/hermes_bridge_service/app.py
 
 if [ -z "${HERMES_AGENT_HTTP_URL:-}" ]; then
   export HERMES_AGENT_HTTP_URL="http://${HERMES_BRIDGE_HOST:-127.0.0.1}:${HERMES_BRIDGE_PORT:-8031}"
 fi
 
-start_service "clink_hermes_console" python3 services/console_api/app.py
+start_service "clink_hermes_console" "$PYTHON_BIN" services/console_api/app.py
 
 echo
 echo "Clink Polymarket public MCP surface is ready."
