@@ -72,7 +72,7 @@ flowchart LR
 This adapter also ships a browser console for Hermes-driven trading workflows:
 
 ```text
-User -> Clink Console -> Hermes bridge / local MCP runner -> clink-polymarket tools -> clink-core gates -> Polymarket execution
+User -> Clink Console -> Hermes Bridge -> hermes chat -q -> clink_polymarket MCP tools -> clink-core gates -> Polymarket execution
 ```
 
 The console is intentionally not just a config form. It shows:
@@ -83,11 +83,16 @@ The console is intentionally not just a config form. It shows:
 - A human LIVE launch gate before real Polymarket submission.
 - Execution result with order id / tx hash when available.
 
-By default, if `HERMES_AGENT_HTTP_URL` is empty, the console uses a Hermes-compatible local MCP runner that calls the same public tool flow Hermes sees. If a Hermes HTTP bridge is available, set:
+The demo starts a local Hermes Bridge by default. The browser does not call Hermes directly; it calls `console_api`, which calls `hermes_bridge_service`, which runs `hermes chat -q` with the configured `clink_polymarket` MCP server.
 
 ```env
-HERMES_AGENT_HTTP_URL=http://127.0.0.1:<hermes-bridge-port>
+HERMES_BRIDGE_HOST=127.0.0.1
+HERMES_BRIDGE_PORT=8031
+HERMES_BRIDGE_COMMAND=hermes chat -q
+HERMES_AGENT_HTTP_URL=http://127.0.0.1:8031
 ```
+
+If `HERMES_AGENT_HTTP_URL` is configured and the bridge is unavailable, the console returns a visible bridge error instead of silently pretending to be Hermes. Leaving `HERMES_AGENT_HTTP_URL` empty is the explicit local-debug fallback mode.
 
 Console URL when running the demo:
 
@@ -153,6 +158,7 @@ polymarket_portfolio_service    8023
 polymarket_order_service        8024
 polymarket_execution_service    8025
 polymarket_mcp_server           9020
+clink_hermes_bridge             8031
 clink_hermes_console            8030
 ```
 
@@ -161,6 +167,7 @@ Smoke test:
 ```bash
 python3 scripts/polymarket_readonly_smoke.py
 python3 scripts/public_mcp_surface_smoke.py
+python3 services/hermes_bridge_service/app.py --sample
 python3 services/console_api/app.py --sample
 ```
 

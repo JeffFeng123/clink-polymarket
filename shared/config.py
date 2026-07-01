@@ -21,6 +21,8 @@ class AppConfig:
     polymarket_mcp_port: int = 9020
     console_api_host: str = "0.0.0.0"
     console_api_port: int = 8030
+    hermes_bridge_host: str = "127.0.0.1"
+    hermes_bridge_port: int = 8031
     polymarket_trade_intent_file: str = "services/trade_service/trade_intents.jsonl"
     polymarket_position_file: str = "services/portfolio_service/positions.jsonl"
     polymarket_order_preview_file: str = "services/order_service/order_previews.jsonl"
@@ -63,6 +65,8 @@ class AppConfig:
             polymarket_mcp_port=int(os.getenv("POLYMARKET_MCP_PORT", "9020")),
             console_api_host=os.getenv("CONSOLE_API_HOST", "0.0.0.0"),
             console_api_port=int(os.getenv("CONSOLE_API_PORT", "8030")),
+            hermes_bridge_host=os.getenv("HERMES_BRIDGE_HOST", "127.0.0.1"),
+            hermes_bridge_port=int(os.getenv("HERMES_BRIDGE_PORT", "8031")),
             polymarket_trade_intent_file=os.getenv(
                 "POLYMARKET_TRADE_INTENT_FILE",
                 "services/trade_service/trade_intents.jsonl",
@@ -104,6 +108,10 @@ class AppConfig:
     @property
     def console_api_url(self) -> str:
         return f"http://{self.console_api_host}:{self.console_api_port}"
+
+    @property
+    def hermes_bridge_url(self) -> str:
+        return f"http://{self.hermes_bridge_host}:{self.hermes_bridge_port}"
 
     @property
     def market_service_url(self) -> str:

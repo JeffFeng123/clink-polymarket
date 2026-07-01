@@ -61,10 +61,10 @@ def _to_dict(value: Any) -> Any:
     return value
 
 
-def _post_json(url: str, payload: dict) -> dict:
+def _post_json(url: str, payload: dict, timeout: int = 210) -> dict:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -73,6 +73,7 @@ def _call_hermes_bridge(request: AgentMessageRequest) -> dict | None:
     if not bridge_url:
         return None
     try:
+        timeout = int(os.getenv("HERMES_CONSOLE_BRIDGE_TIMEOUT_SECONDS", "210"))
         return _post_json(
             bridge_url.rstrip("/") + "/message",
             {
@@ -82,6 +83,7 @@ def _call_hermes_bridge(request: AgentMessageRequest) -> dict | None:
                 "amount_usdc": request.amount_usdc,
                 "source": "clink_console",
             },
+            timeout=timeout,
         )
     except Exception as exc:
         return {
@@ -166,6 +168,7 @@ def create_app() -> FastAPI:
             "service": "clink_hermes_console_api",
             "status": "ok",
             "mode": "hermes_http_bridge" if os.getenv("HERMES_AGENT_HTTP_URL") else "local_mcp_runner",
+            "bridge_url": os.getenv("HERMES_AGENT_HTTP_URL", ""),
             "site_dir": str(SITE_DIR),
         }
 
@@ -182,10 +185,9 @@ def create_app() -> FastAPI:
         bridged = _call_hermes_bridge(request)
         if bridged is not None and bridged.get("bridge_mode") != "http_bridge_failed":
             return bridged
-        local = _run_local_hermes_flow(request)
         if bridged is not None:
-            local["hermes_bridge_error"] = bridged.get("error")
-        return local
+            raise HTTPException(status_code=502, detail=f"Hermes bridge failed: {bridged.get('error')}")
+        return _run_local_hermes_flow(request)
 
     @app.post("/api/previews/lookup")
     def lookup_preview(request: PreviewLookupRequest) -> dict:

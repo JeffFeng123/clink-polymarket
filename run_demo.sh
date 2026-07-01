@@ -62,10 +62,21 @@ start_service "polymarket_portfolio_service" python3 services/portfolio_service/
 start_service "polymarket_order_service" python3 services/order_service/app.py
 start_service "polymarket_execution_service" python3 services/execution_service/app.py
 start_service "polymarket_mcp_server" python3 mcp_servers/polymarket_server.py
+
+if [ -z "${HERMES_BRIDGE_WORKDIR:-}" ]; then
+  export HERMES_BRIDGE_WORKDIR="$ROOT_DIR"
+fi
+start_service "clink_hermes_bridge" python3 services/hermes_bridge_service/app.py
+
+if [ -z "${HERMES_AGENT_HTTP_URL:-}" ]; then
+  export HERMES_AGENT_HTTP_URL="http://${HERMES_BRIDGE_HOST:-127.0.0.1}:${HERMES_BRIDGE_PORT:-8031}"
+fi
+
 start_service "clink_hermes_console" python3 services/console_api/app.py
 
 echo
 echo "Clink Polymarket public MCP surface is ready."
+echo "Hermes Bridge is running at http://${HERMES_BRIDGE_HOST:-127.0.0.1}:${HERMES_BRIDGE_PORT:-8031}"
 echo "Clink x Hermes Mission Control is running at http://${CONSOLE_API_HOST:-0.0.0.0}:${CONSOLE_API_PORT:-8030}"
 echo "Run: python3 scripts/polymarket_readonly_smoke.py"
 echo "Run: python3 scripts/public_mcp_surface_smoke.py"

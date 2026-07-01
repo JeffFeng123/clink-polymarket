@@ -80,7 +80,7 @@ function renderReadiness(readiness, health, consoleHealth) {
   $('launchCore').textContent = readiness.live_ready ? 'READY' : 'HOLD';
   $('headline').textContent = readiness.live_ready ? 'Hermes can propose. Clink is cleared for launch.' : 'Live launch is blocked until Clink clears readiness.';
 
-  $('bridgePill').lastChild.textContent = consoleHealth.mode === 'hermes_http_bridge' ? 'Hermes HTTP bridge' : 'Local MCP runner';
+  $('bridgePill').lastChild.textContent = consoleHealth.mode === 'hermes_http_bridge' ? 'Hermes CLI bridge' : 'Local MCP runner';
 
   const checks = [
     ['Live mode', readiness.live_mode_enabled ? 'Enabled' : 'Disabled', readiness.live_mode_enabled],
@@ -135,7 +135,7 @@ async function handleTask(event) {
       body: JSON.stringify({ message, amount_usdc: amount, user_id: 'console-user', agent_id: 'hermes_console_agent' }),
     });
     (payload.agent_messages || ['Hermes returned a response.']).forEach((line) => addBubble(line, 'agent'));
-    if (payload.hermes_bridge_error) addBubble(`Bridge fallback: ${payload.hermes_bridge_error}`, 'system');
+    if (payload.hermes_bridge_error) addBubble(`Hermes bridge failed, local fallback used: ${payload.hermes_bridge_error}`, 'system');
     if (payload.order_preview) renderPreview(payload.order_preview);
     if (payload.selected_opportunity) addTimeline('Opportunity selected', payload.selected_opportunity.question || payload.selected_opportunity.market_id, 'good');
   } catch (error) {
