@@ -29,7 +29,7 @@ clink-core:
 
 ## Current v0.1 Scope
 
-This first version is public-MCP, read-only, and paper-only, but it strongly depends on `clink-core` for trade intent control:
+This version is public-MCP and safe-by-default. It is paper/dry-run unless live execution is explicitly configured and confirmed, and it strongly depends on `clink-core` for trade intent control:
 
 - Search active Polymarket markets through the Gamma API.
 - Normalize market data into stable adapter objects.
@@ -40,8 +40,8 @@ This first version is public-MCP, read-only, and paper-only, but it strongly dep
 - Create local paper trade intents / order previews only after core policy is not blocked.
 - Record paper positions with capital deployed, current value, and unrealized PnL.
 - Expose standard MCP tools that Hermes or any other agent runtime can discover and call.
-- Do not sign orders.
-- Do not submit live trades.
+- Sign and submit live limit orders only when live mode is configured, the order preview has a CLOB token id, `user_confirmed=true`, and `live_submission_confirmed=true`.
+- Keep live execution behind `POLYMARKET_MAX_ORDER_USDC` and `POLYMARKET_REQUIRE_USER_CONFIRMATION=true`.
 - Do not custody funds.
 
 Polymarket official docs recommend using the Gamma events endpoint for active market discovery:
@@ -76,7 +76,7 @@ flowchart LR
 | `create_order_preview` | Create a non-executing live order preview that requires user confirmation. |
 | `get_order_preview` | Fetch a stored order preview. |
 | `check_live_readiness` | Check whether live execution is configured without exposing secrets. |
-| `execute_approved_trade` | Evaluate execution for an order preview; dry-run by default. |
+| `execute_approved_trade` | Execute an approved preview; dry-run by default, live only with explicit live submission confirmation. |
 | `get_trade_execution` | Fetch a stored execution evaluation. |
 | `submit_agent_trade_intent` | One-call agent flow: score, core-gate, create trade intent, record paper position. |
 | `create_paper_position` | Record a paper position after a trade intent is approved. |
@@ -126,6 +126,33 @@ python3 scripts/polymarket_readonly_smoke.py
 python3 scripts/public_mcp_surface_smoke.py
 ```
 
+Live execution configuration:
+
+```env
+POLYMARKET_CLOB_HOST=https://clob.polymarket.com
+POLYMARKET_LIVE_MODE=true
+POLYMARKET_PRIVATE_KEY=your-dedicated-trading-wallet-private-key
+POLYMARKET_FUNDER_ADDRESS=your-polymarket-deposit-wallet-address
+POLYMARKET_SIGNATURE_TYPE=3
+POLYMARKET_CHAIN_ID=137
+POLYMARKET_MAX_ORDER_USDC=1
+POLYMARKET_REQUIRE_USER_CONFIRMATION=true
+```
+
+Optional L2 credentials can be supplied together; otherwise the adapter derives them from the private key:
+
+```env
+POLYMARKET_API_KEY=
+POLYMARKET_API_SECRET=
+POLYMARKET_API_PASSPHRASE=
+```
+
+A live order is submitted only when the MCP call includes both confirmations:
+
+```text
+execute_approved_trade(order_preview_id, user_confirmed=true, live_submission_confirmed=true)
+```
+
 Read-only smoke path:
 
 ```text
@@ -155,7 +182,7 @@ services/opportunity_service/   market opportunity scoring
 services/trade_service/         paper trade intent / order preview
 services/portfolio_service/     paper positions / portfolio / PnL
 services/order_service/         non-executing order previews
-services/execution_service/     dry-run execution gate / live readiness checks
+services/execution_service/     dry-run gate / live CLOB limit-order submission
 mcp_servers/                    Polymarket MCP adapter
 scripts/                        smoke tests
 shared/                         config
@@ -184,13 +211,13 @@ clink-polymarket is the venue adapter.
 
 1. Add market snapshot scoring for spread, expiry, and historical movement.
 2. Add research/signal service for thesis generation.
-3. Add controlled live execution only after policy, confirmation, signer isolation, and compliance review. Order preview and dry-run execution are available as pre-live checkpoints.
-4. Add order/position reconciliation against Polymarket execution APIs.
+3. Add order/position reconciliation against Polymarket execution APIs.
+4. Add signer isolation / session-wallet flow before increasing order limits.
 
 ## Current Boundaries
 
-- v0.1 is read-only and paper-only.
+- Default mode is read-only / paper / dry-run. Live submission requires explicit environment configuration and explicit MCP call confirmation.
 - `clink-core` action, policy, and audit services must be running for trade intent creation.
-- No live Polymarket orders are signed or submitted.
+- Live orders are submitted only through `execute_approved_trade` with `user_confirmed=true` and `live_submission_confirmed=true`.
 - If Gamma API is unavailable, the service returns mock fallback markets for demo continuity.
 - US/restricted-jurisdiction trading and Polymarket Terms of Service must be respected before any live execution work.

@@ -18,6 +18,7 @@ class PredictionMarket(BaseModel):
     event_title: str | None = None
     outcomes: list[str] = Field(default_factory=list)
     outcome_prices: list[float] = Field(default_factory=list)
+    clob_token_ids: list[str] = Field(default_factory=list)
     best_yes_price: float | None = None
     best_no_price: float | None = None
     liquidity: float | None = None

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ExecuteApprovedTradeRequest(BaseModel):
     order_preview_id: str
     user_confirmed: bool = False
+    live_submission_confirmed: bool = False
     confirmation_message: str | None = None
     metadata: dict = Field(default_factory=dict)
 
@@ -17,6 +18,7 @@ class TradeExecution(BaseModel):
     question: str | None = None
     outcome: str | None = None
     side: str | None = None
+    token_id: str | None = None
     amount_usdc: str | None = None
     limit_price: float | None = None
     estimated_shares: float | None = None

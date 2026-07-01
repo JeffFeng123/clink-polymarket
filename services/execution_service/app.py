@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Clink Polymarket Execution Service",
         version="0.1.0",
-        description="Dry-run execution gate for approved Polymarket order previews.",
+        description="Execution gate for approved Polymarket order previews.",
     )
     app.add_middleware(
         CORSMiddleware,
@@ -38,7 +38,7 @@ def create_app() -> FastAPI:
         return {
             "service": "polymarket_execution_service",
             "status": "ok",
-            "mode": "dry_run" if not APP_CONFIG.polymarket_live_mode else "live_blocked_not_implemented",
+            "mode": "dry_run" if not APP_CONFIG.polymarket_live_mode else "live_limit_order_enabled",
         }
 
     @app.get("/live-readiness")

@@ -48,6 +48,44 @@ def _request_json(url: str, payload: dict | None = None) -> dict:
         raise RuntimeError(f"polymarket adapter request failed: {exc}") from exc
 
 
+def _select_token_id(outcome: str, outcomes: list[str], clob_token_ids: list[str]) -> str | None:
+    if not clob_token_ids:
+        return None
+    normalized_outcomes = [str(item).lower() for item in outcomes]
+    normalized_outcome = (outcome or "Yes").lower()
+    if normalized_outcome in normalized_outcomes:
+        index = normalized_outcomes.index(normalized_outcome)
+        if index < len(clob_token_ids):
+            return str(clob_token_ids[index])
+    if normalized_outcome == "no" and len(clob_token_ids) > 1:
+        return str(clob_token_ids[1])
+    return str(clob_token_ids[0])
+
+
+def _lookup_market_token_context(market_id: str, question: str, outcome: str) -> dict:
+    for query in [market_id, question]:
+        if not query:
+            continue
+        result = _request_json(
+            f"{CONFIG.market_service_url}/markets/search",
+            {"query": query, "limit": 20, "tradable_only": False},
+        )
+        for market in result.get("markets", []):
+            if str(market.get("market_id")) != str(market_id) and str(market.get("condition_id")) != str(market_id) and market.get("question") != question:
+                continue
+            clob_token_ids = [str(item) for item in market.get("clob_token_ids", [])]
+            outcomes = [str(item) for item in market.get("outcomes", [])]
+            token_id = _select_token_id(outcome, outcomes, clob_token_ids)
+            return {
+                "token_id": token_id,
+                "clob_token_ids": clob_token_ids,
+                "outcomes": outcomes,
+                "condition_id": market.get("condition_id"),
+                "market_url": market.get("url"),
+            }
+    return {"token_id": None, "clob_token_ids": [], "outcomes": []}
+
+
 def _create_core_action_intent(
     user_id: str,
     agent_id: str,
@@ -292,18 +330,32 @@ def create_order_preview(
     agent_id: str = "external_agent",
     outcome: str = "Yes",
     side: str = "buy",
+    token_id: str | None = None,
+    clob_token_ids: list[str] | None = None,
     max_slippage_bps: int = 100,
     authorization_id: str | None = None,
     user_confirmed: bool = False,
     metadata: dict | None = None,
 ) -> OrderPreview:
     """Create a non-executing live order preview that requires user confirmation before any future live execution."""
+    token_context = _lookup_market_token_context(market_id, question, outcome) if not token_id and not clob_token_ids else {}
+    resolved_clob_token_ids = clob_token_ids or token_context.get("clob_token_ids") or []
+    resolved_token_id = token_id or token_context.get("token_id") or _select_token_id(
+        outcome,
+        token_context.get("outcomes", []),
+        resolved_clob_token_ids,
+    )
     enriched_metadata = {
         **(metadata or {}),
         "market_id": market_id,
         "question": question,
         "outcome": outcome,
         "side": side,
+        "token_id": resolved_token_id,
+        "clob_token_ids": resolved_clob_token_ids,
+        "outcomes": token_context.get("outcomes", []),
+        "condition_id": token_context.get("condition_id"),
+        "market_url": token_context.get("market_url"),
         "adapter": "clink-polymarket",
         "live_mode": True,
         "preview_only": True,
@@ -351,6 +403,8 @@ def create_order_preview(
         question=question,
         outcome=outcome,
         side=side,
+        token_id=resolved_token_id,
+        clob_token_ids=resolved_clob_token_ids,
         amount_usdc=amount_usdc,
         limit_price=limit_price,
         max_slippage_bps=max_slippage_bps,
@@ -382,6 +436,7 @@ def check_live_readiness() -> LiveReadiness:
 def execute_approved_trade(
     order_preview_id: str,
     user_confirmed: bool = False,
+    live_submission_confirmed: bool = False,
     confirmation_message: str | None = None,
     metadata: dict | None = None,
 ) -> TradeExecution:
@@ -389,6 +444,7 @@ def execute_approved_trade(
     request = ExecuteApprovedTradeRequest(
         order_preview_id=order_preview_id,
         user_confirmed=user_confirmed,
+        live_submission_confirmed=live_submission_confirmed,
         confirmation_message=confirmation_message,
         metadata=metadata or {},
     )

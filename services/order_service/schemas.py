@@ -8,6 +8,8 @@ class CreateOrderPreviewRequest(BaseModel):
     question: str
     outcome: str = "Yes"
     side: str = "buy"
+    token_id: str | None = None
+    clob_token_ids: list[str] = Field(default_factory=list)
     amount_usdc: str
     limit_price: float
     max_slippage_bps: int = 100
@@ -29,6 +31,8 @@ class OrderPreview(BaseModel):
     question: str
     outcome: str
     side: str
+    token_id: str | None = None
+    clob_token_ids: list[str] = Field(default_factory=list)
     amount_usdc: str
     limit_price: float
     estimated_shares: float

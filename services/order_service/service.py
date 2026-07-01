@@ -39,6 +39,8 @@ class OrderPreviewService:
             question=request.question,
             outcome=request.outcome,
             side=request.side,
+            token_id=request.token_id,
+            clob_token_ids=request.clob_token_ids,
             amount_usdc=self._format_amount(amount),
             limit_price=float(price),
             estimated_shares=float(shares),

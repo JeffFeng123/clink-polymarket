@@ -129,7 +129,7 @@ class PolymarketMarketService:
         tokens = [token for token in needle.replace("/", " ").replace("-", " ").split() if len(token) >= 2]
         filtered: list[PredictionMarket] = []
         for market in markets:
-            haystack = f"{market.question} {market.event_title or ''} {market.slug or ''}".lower()
+            haystack = f"{market.market_id} {market.condition_id or ''} {market.question} {market.event_title or ''} {market.slug or ''}".lower()
             if needle and needle in haystack:
                 filtered.append(market)
             elif tokens and all(token in haystack for token in tokens):
@@ -164,6 +164,7 @@ class PolymarketMarketService:
     ) -> PredictionMarket:
         outcomes = self._parse_jsonish_list(market.get("outcomes"))
         prices = [price for price in [self._safe_float(item) for item in self._parse_jsonish_list(market.get("outcomePrices"))] if price is not None]
+        clob_token_ids = [str(item) for item in self._parse_jsonish_list(self._first_present(market, ["clobTokenIds", "clob_token_ids", "tokenIds", "token_ids"]))]
         yes_price = prices[0] if prices else self._safe_float(
             self._first_present(market, ["bestAsk", "bestBid", "lastTradePrice", "last_trade_price"])
         )
@@ -180,6 +181,7 @@ class PolymarketMarketService:
             event_title=event_title,
             outcomes=[str(item) for item in outcomes],
             outcome_prices=prices,
+            clob_token_ids=clob_token_ids,
             best_yes_price=yes_price,
             best_no_price=no_price,
             liquidity=self._safe_float(self._first_present(market, ["liquidity", "liquidityNum", "liquidity_num"])),
@@ -251,6 +253,7 @@ class PolymarketMarketService:
                 event_title="AI Agent Commerce",
                 outcomes=["Yes", "No"],
                 outcome_prices=[0.42, 0.58],
+                clob_token_ids=["mock_yes_token_001", "mock_no_token_001"],
                 best_yes_price=0.42,
                 best_no_price=0.58,
                 liquidity=25000,
@@ -268,6 +271,7 @@ class PolymarketMarketService:
                 event_title="Prediction Market Agents",
                 outcomes=["Yes", "No"],
                 outcome_prices=[0.36, 0.64],
+                clob_token_ids=["mock_yes_token_002", "mock_no_token_002"],
                 best_yes_price=0.36,
                 best_no_price=0.64,
                 liquidity=18000,

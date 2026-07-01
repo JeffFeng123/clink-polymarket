@@ -23,11 +23,15 @@ class AppConfig:
     polymarket_position_file: str = "services/portfolio_service/positions.jsonl"
     polymarket_order_preview_file: str = "services/order_service/order_previews.jsonl"
     polymarket_execution_file: str = "services/execution_service/executions.jsonl"
+    polymarket_clob_host: str = "https://clob.polymarket.com"
     polymarket_live_mode: bool = False
     polymarket_max_order_usdc: str = "1"
     polymarket_require_user_confirmation: bool = True
     polymarket_private_key: str | None = None
     polymarket_funder_address: str | None = None
+    polymarket_api_key: str | None = None
+    polymarket_api_secret: str | None = None
+    polymarket_api_passphrase: str | None = None
     polymarket_signature_type: str = "3"
     polymarket_chain_id: int = 137
     clink_core_action_mcp_url: str = "http://127.0.0.1:9016/mcp/"
@@ -71,11 +75,15 @@ class AppConfig:
                 "POLYMARKET_EXECUTION_FILE",
                 "services/execution_service/executions.jsonl",
             ),
+            polymarket_clob_host=os.getenv("POLYMARKET_CLOB_HOST", "https://clob.polymarket.com"),
             polymarket_live_mode=os.getenv("POLYMARKET_LIVE_MODE", "false").strip().lower() in {"1", "true", "yes", "y"},
             polymarket_max_order_usdc=os.getenv("POLYMARKET_MAX_ORDER_USDC", "1"),
             polymarket_require_user_confirmation=os.getenv("POLYMARKET_REQUIRE_USER_CONFIRMATION", "true").strip().lower() not in {"0", "false", "no", "n"},
             polymarket_private_key=os.getenv("POLYMARKET_PRIVATE_KEY"),
             polymarket_funder_address=os.getenv("POLYMARKET_FUNDER_ADDRESS"),
+            polymarket_api_key=os.getenv("POLYMARKET_API_KEY"),
+            polymarket_api_secret=os.getenv("POLYMARKET_API_SECRET"),
+            polymarket_api_passphrase=os.getenv("POLYMARKET_API_PASSPHRASE"),
             polymarket_signature_type=os.getenv("POLYMARKET_SIGNATURE_TYPE", "3"),
             polymarket_chain_id=int(os.getenv("POLYMARKET_CHAIN_ID", "137")),
             clink_core_action_mcp_url=os.getenv("CLINK_CORE_ACTION_MCP_URL", "http://127.0.0.1:9016/mcp/"),
